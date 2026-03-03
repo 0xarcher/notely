@@ -1,0 +1,23 @@
+graph TB
+    A[Video/Audio Input] --> B{Input Type}
+    B -->|Video| C[Extract Audio]
+    B -->|Video| D[Extract Key Frames]
+    B -->|Audio| E[Audio File]
+
+    C --> F[ASR Transcription]
+    E --> F
+    D --> G[OCR Recognition]
+
+    F --> H[Transcript with Timestamps]
+    G --> I[Text from Slides/Frames]
+
+    H --> J[LLM Processing]
+    I --> J
+
+    J --> K[Generate Structured Notes]
+    K --> L[Markdown Formatter]
+    L --> M[Final Markdown Output]
+
+    style A fill:#e1f5ff
+    style M fill:#d4edda
+    style J fill:#fff3cd

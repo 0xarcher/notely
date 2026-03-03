@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant User
+    participant Notely
+    participant ASR
+    participant OCR
+    participant LLM
+
+    User->>Notely: Initialize with API key
+    User->>Notely: process(video_path)
+
+    Notely->>Notely: Extract audio & frames
+
+    Notely->>ASR: Transcribe audio
+    ASR-->>Notely: Transcript with timestamps
+
+    Notely->>OCR: Recognize text from frames
+    OCR-->>Notely: Extracted text
+
+    Notely->>LLM: Generate notes (transcript + OCR)
+    LLM-->>Notely: Structured Markdown
+
+    Notely->>Notely: Format & beautify
+    Notely-->>User: NotelyResult
+
+    User->>Notely: result.save("notes.md")
+    Notely-->>User: ✓ Saved

@@ -1,0 +1,326 @@
+"""
+Markdown beautifier for creating polished, readable notes.
+
+This module provides post-processing to ensure the output Markdown
+is consistently formatted and visually appealing.
+"""
+
+from __future__ import annotations
+
+from typing import Union
+
+import re
+from dataclasses import dataclass
+
+
+@dataclass
+class FormatterConfig:
+    """Configuration for Markdown formatting."""
+
+    # Line width for wrapping (0 = no wrapping)
+    line_width: int = 0
+
+    # Whether to ensure blank lines between blocks
+    ensure_blank_lines: bool = True
+
+    # Whether to normalize heading levels
+    normalize_headings: bool = True
+
+    # Whether to format lists consistently
+    format_lists: bool = True
+
+    # Whether to add TOC
+    add_toc: bool = False
+
+    # Custom CSS classes for sections
+    section_classes: Union[dict[str, str], None] = None
+
+
+class MarkdownFormatter:
+    """
+    Formatter for beautifying Markdown notes.
+
+    This class applies various formatting rules to make the output
+    more consistent and visually appealing.
+
+    Example:
+        >>> formatter = MarkdownFormatter()
+        >>> raw_markdown = ""
+        >>> beautiful_md = formatter.beautify(raw_markdown)
+    """
+
+    def __init__(self, config: Union[FormatterConfig, None] = None):
+        """
+
+        Args:
+            config (Union[FormatterConfig, None]):
+        """
+        self.config = config or FormatterConfig()
+
+    def beautify(self, markdown: str) -> str:
+        """
+        Apply all formatting rules to beautify the Markdown.
+
+        Args:
+            markdown: Raw Markdown content.
+
+        Returns:
+            Beautified Markdown content.
+        """
+        result = markdown
+
+        # Apply formatting rules in order
+        result = self._normalize_headings(result)
+        result = self._ensure_blank_lines(result)
+        result = self._format_lists(result)
+        result = _fix_common_issues(result)
+        result = self._add_metadata_header(result)
+        result = self._format_formulas(result)
+        result = self._clean_extra_whitespace(result)
+
+        return result.strip()
+
+    @staticmethod
+    def _normalize_headings(markdown: str) -> str:
+        """Normalize heading formatting."""
+        lines = markdown.split("\n")
+        result = []
+
+        for line in lines:
+            # Ensure space after # symbols
+            match = re.match(r"^(#{1,6})([^\s#].*)$", line)
+            if match:
+                level, content = match.groups()
+                result.append(f"{level} {content.strip()}")
+            else:
+                result.append(line)
+
+        return "\n".join(result)
+
+    def _ensure_blank_lines(self, markdown: str) -> str:
+        """Ensure proper blank lines between blocks."""
+        if not self.config.ensure_blank_lines:
+            return markdown
+
+        lines = markdown.split("\n")
+        result = []
+        prev_is_blank = True
+        prev_is_block = False
+
+        for line in lines:
+            is_blank = not line.strip()
+            is_heading = line.startswith("#")
+            # Check if line is a list item (not used currently, but kept for future)
+            _ = re.match(r"^\s*[-*+]|\d+\.", line) is not None
+            is_code = line.startswith("```")
+            is_blockquote = line.startswith(">")
+            is_hr = line.strip() == "---"
+
+            is_block = is_heading or is_code or is_hr or is_blockquote
+
+            # Add blank line before headings (if not at start)
+            if is_heading and not prev_is_blank and result:
+                result.append("")
+
+            # Add blank line after code blocks
+            if prev_is_block and not is_blank and not is_block and result and result[-1] != "":
+                result.append("")
+
+            result.append(line)
+            prev_is_blank = is_blank
+            prev_is_block = is_code or is_hr
+
+        return "\n".join(result)
+
+    def _format_lists(self, markdown: str) -> str:
+        """Format lists consistently."""
+        if not self.config.format_lists:
+            return markdown
+
+        lines = markdown.split("\n")
+        result = []
+
+        for line in lines:
+            # Normalize unordered list markers
+            line = re.sub(r"^(\s*)\* ", r"\1- ", line)
+
+            # Ensure space after list marker
+            line = re.sub(r"^(\s*[-*+])(\S)", r"\1 \2", line)
+            line = re.sub(r"^(\s*\d+\.)(\S)", r"\1 \2", line)
+
+            result.append(line)
+
+        return "\n".join(result)
+
+    @staticmethod
+    def _add_metadata_header(markdown: str) -> str:
+        """Add metadata header if not present."""
+        # Skip if already has frontmatter
+        if markdown.startswith("---"):
+            return markdown
+
+        # Add generation timestamp as comment
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        header = f"<!-- Generated by Notely at {timestamp} -->\n\n"
+
+        return header + markdown
+
+    @staticmethod
+    def _format_formulas(markdown: str) -> str:
+        """Format mathematical formulas."""
+        # Ensure display formulas are on their own lines
+        markdown = re.sub(r"([^\n])\n(\$\$)", r"\1\n\n\2", markdown)
+        markdown = re.sub(r"(\$\$)\n([^\n])", r"\1\n\n\2", markdown)
+
+        return markdown
+
+    @staticmethod
+    def _clean_extra_whitespace(markdown: str) -> str:
+        """Clean up extra whitespace."""
+        # Remove trailing whitespace from lines
+        lines = [line.rstrip() for line in markdown.split("\n")]
+
+        # Remove leading/trailing blank lines
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def add_toc(markdown: str, max_depth: int = 3) -> str:
+        """
+        Add a table of contents to the Markdown.
+
+        Args:
+            markdown: Markdown content.
+            max_depth: Maximum heading depth to include.
+
+        Returns:
+            Markdown with TOC inserted.
+        """
+        headings = []
+        for match in re.finditer(r"^(#{1,6})\s+(.+)$", markdown, re.MULTILINE):
+            level = len(match.group(1))
+            text = match.group(2)
+            if level <= max_depth:
+                headings.append((level, text))
+
+        if not headings:
+            return markdown
+
+        # Generate TOC
+        toc_lines = ["## 📑 目录\n"]
+        for level, text in headings:
+            indent = "  " * (level - 1)
+            # Create anchor link
+            anchor = text.lower().replace(" ", "-")
+            anchor = re.sub(r"[^\w\u4e00-\u9fff-]", "", anchor)
+            toc_lines.append(f"{indent}- [{text}](#{anchor})")
+
+        toc = "\n".join(toc_lines) + "\n\n"
+
+        # Insert TOC after first heading
+        lines = markdown.split("\n", 1)
+        if len(lines) > 1:
+            return lines[0] + "\n\n" + toc + lines[1]
+        return toc + markdown
+
+    @staticmethod
+    def highlight_key_terms(markdown: str, terms: list[str]) -> str:
+        """
+        Highlight key terms in the Markdown.
+
+        Args:
+            markdown: Markdown content.
+            terms: List of terms to highlight.
+
+        Returns:
+            Markdown with highlighted terms.
+        """
+        for term in terms:
+            # Only highlight if not already formatted
+            pattern = rf"(?<![*`]){re.escape(term)}(?![*`])"
+            replacement = f"**{term}**"
+            markdown = re.sub(pattern, replacement, markdown)
+
+        return markdown
+
+    @staticmethod
+    def extract_summary(markdown: str, max_sentences: int = 3) -> str:
+        """
+        Extract a brief summary from the Markdown.
+
+        Args:
+            markdown: Markdown content.
+            max_sentences: Maximum number of sentences.
+
+        Returns:
+            Summary string.
+        """
+        # Remove headings and code blocks
+        text = re.sub(r"^#+.*$", "", markdown, flags=re.MULTILINE)
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+        text = re.sub(r"[#*_`>]", "", text)
+
+        # Get first paragraph
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        if not paragraphs:
+            return ""
+
+        # Extract sentences
+        sentences = re.split(r"[。.!?]", paragraphs[0])
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        return "。".join(sentences[:max_sentences]) + ("。" if sentences else "")
+
+
+def _fix_common_issues(markdown: str) -> str:
+    """Fix common Markdown issues."""
+    # Fix multiple consecutive blank lines
+    markdown = re.sub(r"\n{3,}", "\n\n", markdown)
+
+    # Fix spaces at end of lines
+    markdown = re.sub(r" +\n", "\n", markdown)
+
+    # Fix missing space after period in Chinese
+    markdown = re.sub(r"([。！？])([^\s\n\])】}])", r"\1 \2", markdown)
+
+    # Fix LLM formatting error: "* *text**" -> "**text**"
+    # This handles the common case where LLM outputs "* *详细说明**" instead of "**详细说明**"
+    markdown = re.sub(r"\* \*([^*]+)\*\*", r"**\1**", markdown)
+
+    # Fix separator: "- --" -> "---"
+    markdown = re.sub(r"^- --$", "---", markdown, flags=re.MULTILINE)
+
+    # Fix bold/italic markers
+    markdown = re.sub(r"\*\*([^*]+)\*\*", r"**\1**", markdown)
+    markdown = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"*\1*", markdown)
+
+    return markdown
+
+
+def format_duration(seconds: float) -> str:
+    """Format duration in seconds to human-readable string."""
+    if seconds < 60:
+        return f"{int(seconds)}秒"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{minutes}分{secs}秒"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        return f"{hours}小时{minutes}分"
+
+
+def format_file_size(bytes_size: int) -> str:
+    """Format file size in bytes to human-readable string."""
+    for unit in ["B", "KB", "MB", "GB"]:
+        if bytes_size < 1024:
+            return f"{bytes_size:.1f}{unit}"
+        bytes_size /= 1024
+    return f"{bytes_size:.1f}TB"

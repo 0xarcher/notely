@@ -1,0 +1,36 @@
+graph LR
+    subgraph Input Layer
+        V[Video]
+        A[Audio]
+        P[PDF]
+    end
+
+    subgraph Processing Layer
+        ASR[ASR Backend<br/>FunASR/Whisper]
+        OCR[OCR Backend<br/>PaddleOCR]
+    end
+
+    subgraph AI Layer
+        LLM[LLM Backend<br/>OpenAI/Zhipu/Anthropic]
+    end
+
+    subgraph Output Layer
+        F[Markdown Formatter]
+        O[Structured Notes]
+    end
+
+    V --> ASR
+    A --> ASR
+    V --> OCR
+    P --> OCR
+
+    ASR --> LLM
+    OCR --> LLM
+
+    LLM --> F
+    F --> O
+
+    style ASR fill:#e3f2fd
+    style OCR fill:#e3f2fd
+    style LLM fill:#fff3e0
+    style O fill:#e8f5e9
