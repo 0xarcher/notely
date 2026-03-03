@@ -68,3 +68,6 @@ temp/
 # uv
 .uv/
 uv.lock
+
+# Project instructions
+CLAUDE.md
