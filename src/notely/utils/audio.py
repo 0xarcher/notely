@@ -4,16 +4,14 @@ Audio processing utilities.
 
 from __future__ import annotations
 
-from typing import Union
-
 import subprocess
 import tempfile
 from pathlib import Path
 
 
 def extract_audio(
-    video_path: Union[Path, str],
-    output_path: Union[Path, str, None] = None,
+    video_path: Path | str,
+    output_path: Path | str | None = None,
     audio_format: str = "wav",
     sample_rate: int = 16000,
 ) -> Path:
@@ -62,7 +60,7 @@ def extract_audio(
     return output_path
 
 
-def get_audio_duration(audio_path: Union[Path, str]) -> float:
+def get_audio_duration(audio_path: Path | str) -> float:
     """
     Get the duration of an audio file in seconds.
 
@@ -78,8 +76,8 @@ def get_audio_duration(audio_path: Union[Path, str]) -> float:
 
 
 def normalize_audio(
-    audio_path: Union[Path, str],
-    output_path: Union[Path, str, None] = None,
+    audio_path: Path | str,
+    output_path: Path | str | None = None,
     target_db: float = -20.0,
 ) -> Path:
     """
@@ -119,9 +117,9 @@ def normalize_audio(
 
 
 def split_audio(
-    audio_path: Union[Path, str],
+    audio_path: Path | str,
     chunk_duration: int = 600,  # 10 minutes
-    output_dir: Union[Path, str, None] = None,
+    output_dir: Path | str | None = None,
 ) -> list[Path]:
     """
     Split audio into chunks for processing long recordings.

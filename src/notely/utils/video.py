@@ -4,13 +4,12 @@ Video processing utilities.
 
 from __future__ import annotations
 
-from typing import Union
-
 import json
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -31,7 +30,7 @@ class KeyFrame:
         return self.width, self.height
 
 
-def get_video_duration(video_path: Union[Path, str]) -> float:
+def get_video_duration(video_path: Path | str) -> float:
     """
     Get the duration of a video file in seconds.
 
@@ -46,7 +45,7 @@ def get_video_duration(video_path: Union[Path, str]) -> float:
     return get_media_duration(video_path)
 
 
-def get_video_info(video_path: Union[Path, str]) -> dict:
+def get_video_info(video_path: Path | str) -> dict[Any, Any]:
     """
     Get detailed video information.
 
@@ -71,13 +70,13 @@ def get_video_info(video_path: Union[Path, str]) -> dict:
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        return json.loads(result.stdout)
+        return json.loads(result.stdout)  # type: ignore[no-any-return]
     except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
         raise RuntimeError(f"Failed to get video info: {e}") from e
 
 
 def extract_frame(
-    video_path: Union[Path, str], timestamp: float, output_path: Union[Path, str, None] = None
+    video_path: Path | str, timestamp: float, output_path: Path | str | None = None
 ) -> Path:
     """
     Extract a single frame from a video at a specific timestamp.
@@ -118,9 +117,9 @@ def extract_frame(
 
 
 def extract_frames(
-    video_path: Union[Path, str],
+    video_path: Path | str,
     interval_seconds: float = 1.0,
-    output_dir: Union[Path, str, None] = None,
+    output_dir: Path | str | None = None,
 ) -> list[Path]:
     """
     Extract frames from a video at regular intervals.
@@ -168,10 +167,10 @@ def extract_frames(
 
 
 def extract_key_frames(
-    video_path: Union[Path, str],
+    video_path: Path | str,
     interval_seconds: float = 5.0,
     min_similarity: float = 0.85,
-    output_dir: Union[Path, str, None] = None,
+    output_dir: Path | str | None = None,
 ) -> list[KeyFrame]:
     """
     Extract key frames from a video, filtering out similar frames.
@@ -280,7 +279,7 @@ def _compute_histogram(image: np.ndarray) -> np.ndarray:
     # Normalize
     hist = hist / hist.sum()
 
-    return hist
+    return hist  # type: ignore[no-any-return]
 
 
 class VideoProcessor:
@@ -291,15 +290,15 @@ class VideoProcessor:
     operations commonly needed for lecture transcription.
     """
 
-    def __init__(self, video_path: Union[Path, str]):
+    def __init__(self, video_path: Path | str):
         self.video_path = Path(video_path)
         if not self.video_path.exists():
             raise FileNotFoundError(f"Video file not found: {self.video_path}")
 
-        self._info: Union[dict, None] = None
+        self._info: dict[Any, Any] | None = None
 
     @property
-    def info(self) -> dict:
+    def info(self) -> dict[Any, Any]:
         """Get video information (cached)."""
         if self._info is None:
             self._info = get_video_info(self.video_path)
@@ -326,7 +325,7 @@ class VideoProcessor:
                 return int(stream.get("height", 0))
         return 0
 
-    def extract_audio(self, output_path: Union[Path, str, None] = None) -> Path:
+    def extract_audio(self, output_path: Path | str | None = None) -> Path:
         """Extract audio from the video."""
         from notely.utils.audio import extract_audio
 
@@ -336,7 +335,7 @@ class VideoProcessor:
         self,
         interval_seconds: float = 5.0,
         min_similarity: float = 0.85,
-        output_dir: Union[Path, str, None] = None,
+        output_dir: Path | str | None = None,
     ) -> list[KeyFrame]:
         """Extract key frames from the video."""
         return extract_key_frames(

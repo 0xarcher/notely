@@ -23,6 +23,11 @@ English | [简体中文](README_zh.md)
 - 🎯 **High-Quality Speech Recognition** - FunASR (Chinese CER < 3%), Whisper (multilingual)
 - 📊 **Intelligent OCR** - PaddleOCR + key frame deduplication
 - 🤖 **Multi-LLM Support** - OpenAI, Zhipu AI, Anthropic, Moonshot, DeepSeek
+- 🧠 **Three-Layer Enhancement Architecture** - Comprehension → Structuring → Polishing
+- ✂️ **Semantic Chunking** - Intelligent text segmentation (2000 tokens, 1000 overlap)
+- 📐 **LaTeX Formula Support** - Mathematical notation rendering
+- 🌍 **Language Auto-Detection** - Automatic transcript language detection
+- ⚡ **Concurrent Processing** - Parallel chunk processing for efficiency
 - ✨ **Beautiful Output** - Structured Markdown with automatic formatting
 - 🔧 **Flexible Configuration** - Simple initialization with deep customization support
 
@@ -55,24 +60,46 @@ sudo apt-get install ffmpeg
 ### 2. Basic Usage
 
 ```python
-import os
-from notely import Notely
+from notely import Notely, NotelyConfig, EnhancerConfig, LLMConfig
 
-# Explicitly pass API key
-notely = Notely(api_key="sk-xxx")
-
-# Or read from environment variable
-notely = Notely(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Process lecture video
-result = notely.process(
-    video_path="lecture.mp4",
-    title="Introduction to Machine Learning",
-    instructor="Prof. Zhang",
+# Method 1: From configuration object
+config = NotelyConfig(
+    enhancer=EnhancerConfig(
+        llm=LLMConfig(
+            api_key="sk-xxx",
+            model="gpt-4o",
+        )
+    )
 )
+notely = Notely(config)
+
+# Process lecture video (async)
+import asyncio
+
+result = asyncio.run(notely.process("lecture.mp4"))
 
 # Save notes
 result.save("notes.md")
+```
+
+```python
+# Method 2: From dictionary (simpler)
+notely = Notely.from_dict({
+    "llm": {
+        "api_key": "sk-xxx",
+        "model": "gpt-4o",
+    }
+})
+
+result = asyncio.run(notely.process("lecture.mp4"))
+result.save("notes.md")
+```
+
+```python
+# Method 3: From YAML file (recommended for complex configs)
+# Create config.yaml first, then:
+notely = Notely.from_yaml("config.yaml")
+result = asyncio.run(notely.process("lecture.mp4"))
 ```
 
 ### 3. Usage Flow
@@ -119,17 +146,21 @@ This lecture introduces the basic concepts of machine learning...
 
 ### Initialization
 
-#### Method 1: Basic Usage
+#### Method 1: From Dictionary (Simplest)
 
 ```python
-import os
 from notely import Notely
 
-# Explicitly pass API key
-notely = Notely(api_key="sk-xxx")
+# Basic usage
+notely = Notely.from_dict({
+    "llm": {"api_key": "sk-xxx", "model": "gpt-4o"}
+})
 
-# Or read from environment variable
-notely = Notely(api_key=os.getenv("OPENAI_API_KEY"))
+# With environment variable
+import os
+notely = Notely.from_dict({
+    "llm": {"api_key": os.getenv("OPENAI_API_KEY"), "model": "gpt-4o"}
+})
 ```
 
 #### Method 2: Switch LLM Provider
@@ -138,36 +169,44 @@ notely = Notely(api_key=os.getenv("OPENAI_API_KEY"))
 import os
 
 # Use Zhipu AI
-notely = Notely(
-    api_key=os.getenv("ZHIPU_API_KEY"),
-    provider="zhipu",
-    model="glm-4",
-)
+notely = Notely.from_dict({
+    "llm": {
+        "api_key": os.getenv("ZHIPU_API_KEY"),
+        "provider": "zhipu",
+        "model": "glm-4",
+    }
+})
 
 # Use Anthropic
-notely = Notely(
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    provider="anthropic",
-    model="claude-3-opus-20240229",
-)
+notely = Notely.from_dict({
+    "llm": {
+        "api_key": os.getenv("ANTHROPIC_API_KEY"),
+        "provider": "anthropic",
+        "model": "claude-3-opus-20240229",
+    }
+})
 
 # Use Moonshot
-notely = Notely(
-    api_key=os.getenv("MOONSHOT_API_KEY"),
-    provider="moonshot",
-    model="moonshot-v1-8k",
-)
+notely = Notely.from_dict({
+    "llm": {
+        "api_key": os.getenv("MOONSHOT_API_KEY"),
+        "provider": "moonshot",
+        "model": "moonshot-v1-8k",
+    }
+})
 ```
 
 #### Method 3: Custom OpenAI-Compatible Endpoint
 
 ```python
-notely = Notely(
-    api_key="sk-xxx",
-    provider="custom",
-    model="qwen-plus",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-)
+notely = Notely.from_dict({
+    "llm": {
+        "api_key": "sk-xxx",
+        "provider": "openai",
+        "model": "qwen-plus",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    }
+})
 ```
 
 #### Method 4: Full Configuration
@@ -175,32 +214,73 @@ notely = Notely(
 ```python
 import os
 
-notely = Notely(
+notely = Notely.from_dict({
     # LLM configuration
-    api_key=os.getenv("OPENAI_API_KEY"),
-    provider="openai",
-    model="gpt-4o",
-    base_url="https://api.openai.com/v1",  # Optional
-    temperature=0.7,
-    max_tokens=4096,
+    "llm": {
+        "api_key": os.getenv("OPENAI_API_KEY"),
+        "provider": "openai",
+        "model": "gpt-4o",
+        "base_url": "https://api.openai.com/v1",  # Optional
+        "temperature": 0.3,  # Lower for consistency (default: 0.3)
+        "max_tokens": 4096,
+    },
 
     # ASR configuration
-    asr_backend="funasr",  # Recommended for Chinese: funasr, multilingual: whisper
-    asr_device="cuda",     # Use cuda with GPU, otherwise cpu
-    asr_model="iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+    "asr": {
+        "backend": "funasr",  # Recommended for Chinese: funasr, multilingual: whisper
+        "device": "cuda",     # Use cuda with GPU, otherwise cpu
+        "model": "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+        "language": "zh",
+    },
 
     # OCR configuration
-    ocr_backend="paddleocr",
-    ocr_lang="ch",  # Chinese: ch, English: en
+    "ocr": {
+        "backend": "paddleocr",
+        "language": "ch",  # Chinese: ch, English: en
+        "use_gpu": True,
+    },
 
-    # Processing settings
-    key_frame_interval_seconds=5.0,  # Key frame extraction interval
-    min_frame_similarity=0.85,       # Frame deduplication similarity threshold
+    # Enhancement settings (NEW)
+    "enhancer": {
+        "chunk_size": 2000,        # Maximum chunk size in tokens (default: 2000)
+        "chunk_overlap": 1000,     # Overlap between chunks in tokens (default: 1000)
+        "language": None,          # Output language: 'zh', 'en', or None for auto-detect
+        "max_concurrent": 5,       # Maximum concurrent API calls
+    },
+})
+```
 
-    # Other settings
-    template="academic",  # Note template: academic, technical, meeting
-    verbose=True,         # Show detailed logs
-)
+#### Method 5: From YAML File (Recommended)
+
+Create `config.yaml`:
+```yaml
+llm:
+  api_key: sk-xxx
+  provider: openai
+  model: gpt-4o
+  temperature: 0.3
+  max_tokens: 4096
+
+asr:
+  backend: funasr
+  device: cuda
+  language: zh
+
+ocr:
+  backend: paddleocr
+  language: ch
+  use_gpu: true
+
+enhancer:
+  chunk_size: 2000
+  chunk_overlap: 1000
+  language: null  # Auto-detect
+  max_concurrent: 5
+```
+
+Then load:
+```python
+notely = Notely.from_yaml("config.yaml")
 ```
 
 ### Supported LLM Providers
@@ -219,77 +299,33 @@ notely = Notely(
 #### Process Video
 
 ```python
-# Basic usage
-result = notely.process(
-    video_path="lecture.mp4",
-    title="Course Title",
-)
+import asyncio
 
-# With PDF slides
-result = notely.process(
-    video_path="lecture.mp4",
-    pdf_paths=["slides.pdf", "handout.pdf"],
-    title="Deep Learning Fundamentals",
-    instructor="Prof. Li",
-    date="2026-03-03",
-)
+# Basic usage
+result = asyncio.run(notely.process("lecture.mp4"))
+
+# Or use await in async function
+async def main():
+    result = await notely.process("lecture.mp4")
+    result.save("notes.md")
+
+asyncio.run(main())
 ```
 
 #### Process Audio
 
 ```python
-# Method 1: Use process_audio
-result = notely.process_audio(
-    audio_path="podcast.mp3",
-    title="Tech Podcast Episode 42",
-)
-
-# Method 2: Use process
-result = notely.process(
-    audio_path="recording.wav",
-    title="Meeting Recording",
-)
-```
-
-#### Process PDF
-
-```python
-result = notely.process_pdf(
-    pdf_path="presentation.pdf",
-    title="Product Launch",
-)
-```
-
-### Custom Note Templates
-
-```python
-from notely.prompts import NoteTemplate
-
-# Use built-in templates
-notely = Notely(api_key="sk-xxx", template="academic")  # Academic style
-notely = Notely(api_key="sk-xxx", template="technical") # Technical style
-notely = Notely(api_key="sk-xxx", template="meeting")   # Meeting notes
-
-# Custom template
-template = NoteTemplate(
-    name="meeting",
-    language="en",
-    style="casual",
-    include_timestamps=True,
-    include_transcript=False,
-    custom_sections=["Action Items", "Decisions"],
-)
-
-result = notely.process(
-    video_path="meeting.mp4",
-    template=template,
-)
+# Same API for audio files
+result = asyncio.run(notely.process("podcast.mp3"))
+result.save("notes.md")
 ```
 
 ### Access Processing Results
 
 ```python
-result = notely.process("lecture.mp4")
+import asyncio
+
+result = asyncio.run(notely.process("lecture.mp4"))
 
 # Get Markdown content
 print(result.markdown)
@@ -322,6 +358,23 @@ result.save("output/notes.md")
 
 ### Architecture Overview
 
+Notely uses a three-layer enhancement pipeline to transform raw transcripts into structured notes:
+
+**1. Comprehension Layer** - Extracts semantic information from transcript chunks
+   - Minimum 300 words per chunk summary
+   - Preserves all technical details, formulas, and examples
+   - Concurrent processing for efficiency
+
+**2. Structuring Layer** - Organizes comprehension results into coherent sections
+   - Minimum 200 words per major section
+   - Topic-based organization (not chronological)
+   - Cross-chunk concept merging
+
+**3. Formatting Layer** - Beautifies markdown with LaTeX formula support
+   - Mathematical notation rendering
+   - Consistent heading hierarchy
+   - Emoji icons for visual clarity
+
 <p align="center">
   <img src="docs/images/architecture.png" alt="Architecture Overview" width="800">
 </p>
@@ -331,8 +384,10 @@ result.save("output/notes.md")
 1. **Input Processing** - Extract audio and key frames from video
 2. **ASR Transcription** - Speech to text with timestamps (FunASR for Chinese, Whisper for multilingual)
 3. **OCR Recognition** - Extract text from slides/frames using PaddleOCR
-4. **LLM Generation** - Fuse multimodal information to generate structured notes
-5. **Format Output** - Beautify Markdown for readability
+4. **Semantic Chunking** - Split transcript into 2000-token chunks with 1000-token overlap
+5. **Comprehension** - Extract semantic information from each chunk (parallel processing)
+6. **Structuring** - Organize all chunks into coherent sections by topic
+7. **Format Output** - Beautify Markdown with LaTeX support
 
 ---
 
@@ -342,14 +397,20 @@ result.save("output/notes.md")
 
 - **Chinese content**: Recommended `funasr` (higher accuracy, CER < 3%)
 - **Multilingual content**: Use `whisper` (supports 99+ languages)
-- **No GPU**: Use `whisper` + `asr_device="cpu"`
+- **No GPU**: Use `whisper` + `device="cpu"`
 
 ```python
 # Chinese lectures
-notely = Notely(api_key="sk-xxx", asr_backend="funasr", asr_device="cuda")
+notely = Notely.from_dict({
+    "llm": {"api_key": "sk-xxx"},
+    "asr": {"backend": "funasr", "device": "cuda"}
+})
 
 # English lectures
-notely = Notely(api_key="sk-xxx", asr_backend="whisper", asr_device="cpu")
+notely = Notely.from_dict({
+    "llm": {"api_key": "sk-xxx"},
+    "asr": {"backend": "whisper", "device": "cpu"}
+})
 ```
 
 ### 2. How to reduce costs?
@@ -359,27 +420,31 @@ notely = Notely(api_key="sk-xxx", asr_backend="whisper", asr_device="cpu")
 - Use domestic LLMs (Zhipu, Moonshot, DeepSeek)
 
 ```python
-notely = Notely(
-    api_key=os.getenv("ZHIPU_API_KEY"),
-    provider="zhipu",
-    model="glm-4-flash",  # Cheaper
-    max_tokens=2048,      # Limit output
-)
+notely = Notely.from_dict({
+    "llm": {
+        "api_key": os.getenv("ZHIPU_API_KEY"),
+        "provider": "zhipu",
+        "model": "glm-4-flash",  # Cheaper
+        "max_tokens": 2048,      # Limit output
+    }
+})
 ```
 
 ### 3. How to improve processing speed?
 
-- Use GPU acceleration: `asr_device="cuda"`
-- Increase key frame interval: `key_frame_interval_seconds=10.0`
-- Increase frame similarity threshold: `min_frame_similarity=0.90`
+- Use GPU acceleration: `device="cuda"`
+- Reduce chunk size: `chunk_size=1500`
+- Increase concurrent processing: `max_concurrent=10`
 
 ```python
-notely = Notely(
-    api_key="sk-xxx",
-    asr_device="cuda",
-    key_frame_interval_seconds=10.0,
-    min_frame_similarity=0.90,
-)
+notely = Notely.from_dict({
+    "llm": {"api_key": "sk-xxx"},
+    "asr": {"device": "cuda"},
+    "enhancer": {
+        "chunk_size": 1500,
+        "max_concurrent": 10,
+    }
+})
 ```
 
 ### 4. How to handle long videos?
@@ -403,20 +468,32 @@ All formats supported by FFmpeg:
 notely/
 ├── src/notely/
 │   ├── __init__.py          # Main entry point
-│   ├── core.py              # Core logic
+│   ├── core.py              # Core orchestrator
+│   ├── config.py            # Configuration classes
+│   ├── models.py            # Data models
 │   ├── asr/                 # ASR backends
 │   │   ├── funasr.py        # FunASR
 │   │   └── whisper.py       # Whisper
 │   ├── ocr/                 # OCR backends
 │   │   └── paddle.py        # PaddleOCR
-│   ├── llm/                 # LLM backends
-│   │   └── openai.py        # OpenAI-compatible
-│   ├── prompts/             # Note templates
-│   │   ├── templates/       # Template files
-│   │   └── loader.py        # Template loader
+│   ├── llm/                 # LLM client
+│   │   └── client.py        # OpenAI-compatible client
+│   ├── enhancer/            # Three-layer enhancement pipeline
+│   │   ├── comprehension.py # Comprehension agent
+│   │   ├── structuring.py   # Structuring agent
+│   │   ├── enhancer.py      # Main enhancer orchestrator
+│   │   └── models.py        # Enhancer data models
+│   ├── prompts/             # Prompt management
+│   │   ├── comprehension.py # Comprehension prompts
+│   │   ├── structuring.py   # Structuring prompts
+│   │   └── registry.py      # Prompt registry
 │   ├── formatter/           # Markdown formatter
 │   └── utils/               # Utility functions
+│       ├── audio.py         # Audio processing
+│       ├── video.py         # Video processing
+│       └── language.py      # Language detection
 ├── examples/                # Example code
+├── tests/                   # Unit tests
 ├── README.md
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md

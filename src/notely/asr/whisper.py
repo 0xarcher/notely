@@ -5,7 +5,7 @@ OpenAI Whisper backend for ASR.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from notely.asr.base import ASRBackend, ASRResult, TranscriptSegment
 
@@ -30,7 +30,7 @@ class WhisperBackend(ASRBackend):
         self,
         model: str = "large-v3",
         device: str = "auto",
-        language: Union[str, None] = None,
+        language: str | None = None,
     ):
         self.model_size = model
         self.device = device
@@ -40,7 +40,7 @@ class WhisperBackend(ASRBackend):
     def _load_model(self) -> Any:
         """Lazy load the Whisper model."""
         try:
-            import whisper
+            import whisper  # type: ignore[import-not-found]
         except ImportError:
             raise ImportError(
                 "Whisper is not installed. Install it with: pip install openai-whisper"
@@ -54,7 +54,7 @@ class WhisperBackend(ASRBackend):
             self._model = self._load_model()
         return self._model
 
-    def transcribe(self, audio_path: Union[Path, str]) -> ASRResult:
+    def transcribe(self, audio_path: Path | str) -> ASRResult:
         """
         Transcribe audio using Whisper.
 
@@ -98,6 +98,7 @@ class WhisperBackend(ASRBackend):
         """Check if Whisper is available."""
         try:
             import whisper  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -115,10 +116,10 @@ class WhisperAPIBackend(ASRBackend):
         model: Model to use ("whisper-1")
     """
 
-    def __init__(self, api_key: Union[str, None] = None, model: str = "whisper-1"):
+    def __init__(self, api_key: str | None = None, model: str = "whisper-1"):
         self.api_key = api_key
         self.model = model
-        self._client = None
+        self._client: Any = None
 
     @property
     def client(self) -> Any:
@@ -132,7 +133,7 @@ class WhisperAPIBackend(ASRBackend):
             self._client = OpenAI(api_key=self.api_key)
         return self._client
 
-    def transcribe(self, audio_path: Union[Path, str]) -> ASRResult:
+    def transcribe(self, audio_path: Path | str) -> ASRResult:
         """Transcribe using OpenAI API."""
         audio_path = Path(audio_path)
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 
 @dataclass
@@ -18,7 +18,7 @@ class TranscriptSegment:
     start_time: float  # seconds
     end_time: float  # seconds
     confidence: float = 1.0
-    speaker_id: Union[str, None] = None
+    speaker_id: str | None = None
     words: list[dict[str, Any]] = field(default_factory=list)
 
     @property
@@ -86,7 +86,7 @@ class ASRBackend(ABC):
     """Abstract base class for ASR backends."""
 
     @abstractmethod
-    def transcribe(self, audio_path: Union[Path, str]) -> ASRResult:
+    def transcribe(self, audio_path: Path | str) -> ASRResult:
         """
         Transcribe an audio file.
 

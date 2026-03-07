@@ -5,7 +5,7 @@ PaddleOCR backend for OCR - High-quality Chinese/English OCR.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from notely.ocr.base import OCRBackend, OCRResult, TextBlock
 
@@ -44,7 +44,7 @@ class PaddleOCRBackend(OCRBackend):
     def _load_ocr(self) -> Any:
         """Lazy load PaddleOCR."""
         try:
-            from paddleocr import PaddleOCR
+            from paddleocr import PaddleOCR  # type: ignore[import-not-found]
         except ImportError:
             raise ImportError(
                 "PaddleOCR is not installed. Install it with: pip install paddleocr paddlepaddle"
@@ -84,7 +84,7 @@ class PaddleOCRBackend(OCRBackend):
             self._structure = self._load_structure()
         return self._structure
 
-    def recognize(self, image_path: Union[Path, str]) -> OCRResult:
+    def recognize(self, image_path: Path | str) -> OCRResult:
         """
         Recognize text in an image.
 
@@ -126,7 +126,7 @@ class PaddleOCRBackend(OCRBackend):
             metadata={"backend": "paddleocr", "lang": self.lang},
         )
 
-    def recognize_pdf(self, pdf_path: Union[Path, str]) -> list[OCRResult]:
+    def recognize_pdf(self, pdf_path: Path | str) -> list[OCRResult]:
         """
         Recognize text in a PDF file.
 
@@ -141,7 +141,7 @@ class PaddleOCRBackend(OCRBackend):
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
         try:
-            import fitz  # PyMuPDF
+            import fitz  # type: ignore[import-not-found] # PyMuPDF
         except ImportError:
             raise ImportError(
                 "PyMuPDF is required for PDF processing. Install it with: pip install PyMuPDF"
@@ -176,7 +176,7 @@ class PaddleOCRBackend(OCRBackend):
         doc.close()
         return results
 
-    def recognize_table(self, image_path: Union[Path, str]) -> str:
+    def recognize_table(self, image_path: Path | str) -> str:
         """
         Recognize a table and return as Markdown.
 
@@ -193,12 +193,12 @@ class PaddleOCRBackend(OCRBackend):
 
         for region in result:
             if region["type"] == "table":
-                return region.get("res", {}).get("html", "")
+                return region.get("res", {}).get("html", "")  # type: ignore[no-any-return]
 
         return ""
 
     @staticmethod
-    def _parse_bbox(coords: list) -> tuple[int, int, int, int]:
+    def _parse_bbox(coords: list[Any]) -> tuple[int, int, int, int]:
         """Parse bounding box coordinates."""
         xs = [p[0] for p in coords]
         ys = [p[1] for p in coords]

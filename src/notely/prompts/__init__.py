@@ -1,23 +1,8 @@
-"""
-Prompt templates for note generation.
+"""Prompt management for Notely.
+
+This module provides centralized prompt management using a registry pattern.
 """
 
-from notely.prompts.loader import load_template
-from notely.prompts.templates import (
-    NoteTemplate,
-    get_academic_template,
-    get_default_template,
-    get_meeting_template,
-    get_technical_template,
-    get_template,
-)
+from notely.prompts.registry import PromptRegistry
 
-__all__ = [
-    "NoteTemplate",
-    "get_academic_template",
-    "get_default_template",
-    "get_meeting_template",
-    "get_technical_template",
-    "get_template",
-    "load_template",
-]
+__all__ = ["PromptRegistry"]

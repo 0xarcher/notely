@@ -7,7 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 
 @dataclass
@@ -34,8 +34,8 @@ class OCRResult:
 
     text_blocks: list[TextBlock]
     source_path: str = ""
-    timestamp: Union[float, None] = None  # For video frames
-    page_number: Union[int, None] = None  # For PDF pages
+    timestamp: float | None = None  # For video frames
+    page_number: int | None = None  # For PDF pages
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -70,7 +70,7 @@ class OCRBackend(ABC):
     """Abstract base class for OCR backends."""
 
     @abstractmethod
-    def recognize(self, image_path: Union[Path, str]) -> OCRResult:
+    def recognize(self, image_path: Path | str) -> OCRResult:
         """
         Recognize text in an image.
 
@@ -83,7 +83,7 @@ class OCRBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def recognize_pdf(self, pdf_path: Union[Path, str]) -> list[OCRResult]:
+    def recognize_pdf(self, pdf_path: Path | str) -> list[OCRResult]:
         """
         Recognize text in a PDF file.
 

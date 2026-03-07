@@ -1,22 +1,24 @@
 graph LR
-    subgraph Input Layer
-        V[Video]
-        A[Audio]
-        P[PDF]
+    subgraph Input["📥 Input Layer"]
+        V[📹 Video]
+        A[🎵 Audio]
+        P[📄 PDF]
     end
 
-    subgraph Processing Layer
-        ASR[ASR Backend<br/>FunASR/Whisper]
-        OCR[OCR Backend<br/>PaddleOCR]
+    subgraph Processing["⚙️ Processing Layer"]
+        ASR[🎤 ASR Backend<br/>FunASR/Whisper]
+        OCR[👁️ OCR Backend<br/>PaddleOCR]
     end
 
-    subgraph AI Layer
-        LLM[LLM Backend<br/>OpenAI/Zhipu/Anthropic]
+    subgraph AI["🤖 AI Enhancement Layer"]
+        CHUNK[✂️ Semantic Chunking<br/>2000 tokens, 1000 overlap]
+        COMP[🧠 Comprehension Agent<br/>Extract & preserve details]
+        STRUCT[📚 Structuring Agent<br/>Organize by topic]
     end
 
-    subgraph Output Layer
-        F[Markdown Formatter]
-        O[Structured Notes]
+    subgraph Output["📤 Output Layer"]
+        F[✨ Markdown Formatter<br/>LaTeX support]
+        O[📋 Structured Notes]
     end
 
     V --> ASR
@@ -24,13 +26,22 @@ graph LR
     V --> OCR
     P --> OCR
 
-    ASR --> LLM
-    OCR --> LLM
+    ASR --> CHUNK
+    OCR --> CHUNK
 
-    LLM --> F
+    CHUNK --> COMP
+    COMP --> STRUCT
+    STRUCT --> F
     F --> O
 
-    style ASR fill:#e3f2fd
-    style OCR fill:#e3f2fd
-    style LLM fill:#fff3e0
-    style O fill:#e8f5e9
+    style Input fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Processing fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style AI fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Output fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    style ASR fill:#e1bee7
+    style OCR fill:#e1bee7
+    style CHUNK fill:#ffe0b2
+    style COMP fill:#ffe0b2
+    style STRUCT fill:#ffe0b2
+    style O fill:#c8e6c9

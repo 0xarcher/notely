@@ -5,7 +5,7 @@ FunASR backend for ASR - Alibaba's high-quality Chinese ASR model.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from notely.asr.base import ASRBackend, ASRResult, TranscriptSegment
 
@@ -46,7 +46,7 @@ class FunASRBackend(ASRBackend):
     def _load_model(self) -> Any:
         """Lazy load the FunASR model."""
         try:
-            from funasr import AutoModel
+            from funasr import AutoModel  # type: ignore[import-not-found]
         except ImportError:
             raise ImportError(
                 "FunASR is not installed. Install it with: pip install funasr modelscope"
@@ -72,7 +72,7 @@ class FunASRBackend(ASRBackend):
             self._model = self._load_model()
         return self._model
 
-    def transcribe(self, audio_path: Union[Path, str]) -> ASRResult:
+    def transcribe(self, audio_path: Path | str) -> ASRResult:
         """
         Transcribe audio using FunASR.
 
@@ -197,4 +197,4 @@ class FunASRStreaming:
     def transcribe_chunk(audio_chunk: bytes) -> str:
         """Transcribe a chunk of audio data."""
         # Implementation for streaming
-        pass
+        raise NotImplementedError("Streaming transcription not yet implemented")

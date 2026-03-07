@@ -27,27 +27,44 @@ dependencies = [
     "ffmpeg-python>=0.2.0",
     "pillow>=10.0.0",
     "numpy>=1.24.0",
-    "pdfplumber>=0.10.0",  # PDF processing (MIT license)
-    "pyyaml>=6.0",  # YAML parsing for template frontmatter
+    "pdfplumber>=0.10.0", # PDF processing (MIT license)
+    "pyyaml>=6.0", # YAML parsing for template frontmatter
+    "tiktoken>=0.5.0", # Accurate token counting for LLMs
+    "tenacity>=8.0.0", # Retry logic with exponential backoff
+    "hatchling>=1.29.0",
+    "fast-langdetect>=0.2.0", # Language detection with fastText
 ]
 
 [project.optional-dependencies]
-funasr = ["funasr>=1.0.0", "modelscope>=1.10.0"]
+funasr = [
+    "funasr>=1.0.0",
+    "modelscope>=1.10.0",
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+]
 paddleocr = ["paddleocr>=2.7.0", "paddlepaddle>=2.5.0"]
 whisper = ["openai-whisper>=20231117"]
 pdf-fast = ["pymupdf>=1.23.0"]  # High-performance PDF (AGPL license)
 document = ["python-docx>=1.0.0", "python-pptx>=0.6.0"]  # Future: Word/PPT support
-dev = ["ruff>=0.1.0", "pytest>=7.0.0", "pytest-cov>=4.0.0"]
+dev = [
+    "ruff>=0.1.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.12.0",
+]
 all = [
     "funasr>=1.0.0",
     "modelscope>=1.10.0",
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
     "paddleocr>=2.7.0",
     "paddlepaddle>=2.5.0",
     "openai-whisper>=20231117",
 ]
 
-[project.scripts]
-notely = "notely.cli:main"
+# [project.scripts]
+# notely = "notely.cli:main"  # TODO: Rewrite CLI for new API
 
 [build-system]
 requires = ["hatchling"]
@@ -101,3 +118,9 @@ docstring-code-format = true
 [tool.mypy]
 python_version = "3.11"
 strict = true
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "types-pyyaml>=6.0.12.20250915",
+]

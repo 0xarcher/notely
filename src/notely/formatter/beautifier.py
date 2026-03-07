@@ -7,8 +7,6 @@ is consistently formatted and visually appealing.
 
 from __future__ import annotations
 
-from typing import Union
-
 import re
 from dataclasses import dataclass
 
@@ -33,7 +31,7 @@ class FormatterConfig:
     add_toc: bool = False
 
     # Custom CSS classes for sections
-    section_classes: Union[dict[str, str], None] = None
+    section_classes: dict[str, str] | None = None
 
 
 class MarkdownFormatter:
@@ -49,7 +47,7 @@ class MarkdownFormatter:
         >>> beautiful_md = formatter.beautify(raw_markdown)
     """
 
-    def __init__(self, config: Union[FormatterConfig, None] = None):
+    def __init__(self, config: FormatterConfig | None = None):
         """
 
         Args:
@@ -103,7 +101,7 @@ class MarkdownFormatter:
             return markdown
 
         lines = markdown.split("\n")
-        result = []
+        result: list[str] = []
         prev_is_blank = True
         prev_is_block = False
 
@@ -319,8 +317,9 @@ def format_duration(seconds: float) -> str:
 
 def format_file_size(bytes_size: int) -> str:
     """Format file size in bytes to human-readable string."""
+    size: float = float(bytes_size)
     for unit in ["B", "KB", "MB", "GB"]:
-        if bytes_size < 1024:
-            return f"{bytes_size:.1f}{unit}"
-        bytes_size /= 1024
-    return f"{bytes_size:.1f}TB"
+        if size < 1024:
+            return f"{size:.1f}{unit}"
+        size /= 1024
+    return f"{size:.1f}TB"

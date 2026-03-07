@@ -4,8 +4,6 @@ Common utility functions.
 
 from __future__ import annotations
 
-from typing import Union
-
 import os
 import subprocess
 import tempfile
@@ -14,7 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
-def ensure_dir(path: Union[Path, str]) -> Path:
+def ensure_dir(path: Path | str) -> Path:
     """
     Ensure a directory exists, creating it if necessary.
 
@@ -50,7 +48,7 @@ def temp_file(suffix: str = "", prefix: str = "notely_") -> Generator[Path, None
             os.unlink(filepath)
 
 
-def get_media_duration(media_path: Union[Path, str]) -> float:
+def get_media_duration(media_path: Path | str) -> float:
     """
     Get the duration of a media file (audio or video) in seconds.
 

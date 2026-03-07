@@ -1,368 +1,290 @@
 """
-Core module for Notely - Multimodal lecture to Markdown transformation.
+Core module for Notely - Configuration container and processing orchestrator.
+
+This module provides the main Notely class which acts as a configuration
+container and coordinates the ASR → OCR → Enhancer pipeline.
 """
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass, field
+import asyncio
+import logging
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
-from notely.asr import ASRBackend, ASRResult, FunASRBackend, WhisperBackend
+from notely.asr import ASRBackend, FunASRBackend
+from notely.config import NotelyConfig
+from notely.enhancer.enhancer import ThreeLayerEnhancer
 from notely.formatter import MarkdownFormatter
-from notely.llm import LLMBackend, OpenAIBackend
+from notely.models import NotelyResult
 from notely.ocr import OCRBackend, OCRResult, PaddleOCRBackend
-from notely.prompts import NoteTemplate, get_default_template
-from notely.utils import (
-    ensure_dir,
-    extract_audio,
-    extract_key_frames,
-)
+from notely.utils import extract_audio, extract_key_frames
+from notely.utils.language import detect_transcript_language
 
-
-# Provider defaults
-PROVIDER_DEFAULTS = {
-    "openai": {
-        "base_url": "https://api.openai.com/v1",
-    },
-    "zhipu": {
-        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
-    },
-    "anthropic": {
-        "base_url": "https://api.anthropic.com/v1",
-    },
-    "moonshot": {
-        "base_url": "https://api.moonshot.cn/v1",
-    },
-    "deepseek": {
-        "base_url": "https://api.deepseek.com/v1",
-    },
-}
-
-
-@dataclass
-class LectureInput:
-    """Input data for lecture processing."""
-
-    video_path: Union[Path, None] = None
-    audio_path: Union[Path, None] = None
-    pdf_paths: list[Path] = field(default_factory=list)
-    image_paths: list[Path] = field(default_factory=list)
-    subtitle_path: Union[Path, None] = None  # SRT/VTT file if available
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self):
-        # Convert strings to Path objects
-        if isinstance(self.video_path, str):
-            self.video_path = Path(self.video_path)
-        if isinstance(self.audio_path, str):
-            self.audio_path = Path(self.audio_path)
-        if isinstance(self.subtitle_path, str):
-            self.subtitle_path = Path(self.subtitle_path)
-        self.pdf_paths = [Path(p) if isinstance(p, str) else p for p in self.pdf_paths]
-        self.image_paths = [Path(p) if isinstance(p, str) else p for p in self.image_paths]
-
-
-@dataclass
-class NotelyResult:
-    """Result of lecture processing."""
-
-    markdown: str
-    thinking_process: str
-    transcript: ASRResult
-    ocr_results: list[OCRResult]
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def save(self, output_path: Union[Path, str]) -> None:
-        """Save the markdown result to a file."""
-        path = Path(output_path)
-        ensure_dir(path.parent)
-        path.write_text(self.markdown, encoding="utf-8")
+logger = logging.getLogger(__name__)
 
 
 class Notely:
     """
-    Notely - Transform multimodal lectures into structured Markdown notes.
+    Notely - Configuration container and processing orchestrator.
 
-    This SDK provides a complete pipeline for:
-    1. Extracting audio from video
-    2. Transcribing speech (ASR)
-    3. Extracting text from slides (OCR)
-    4. Fusing multimodal information
-    5. Generating beautiful, structured Markdown notes
+    This class acts as a configuration container that holds all settings
+    for ASR, OCR, and Enhancer. It coordinates the processing pipeline:
+    ASR → OCR → Enhancer → Markdown output.
 
-    Examples:
-        # Zero-config (reads OPENAI_API_KEY from environment)
-        >>> notely = Notely()
-        >>> result = notely.process("lecture.mp4")
+    The Notely class does NOT make processing decisions (like choosing
+    between simple/enhanced processing). Instead, it simply orchestrates
+    the configured components.
 
-        # Specify API key
-        >>> notely = Notely(api_key="sk-xxx")
+    Example:
+        from notely import Notely, NotelyConfig, EnhancerConfig, LLMConfig
 
-        # Switch provider
-        >>> notely = Notely(provider="zhipu", model="glm-4")
+        # From configuration object
+        config = NotelyConfig(
+            enhancer=EnhancerConfig(
+                llm=LLMConfig(api_key="sk-xxx", model="gpt-4o")
+            )
+        )
+        notely = Notely(config)
+        result = await notely.process("lecture.mp4")
 
-        # Full configuration
-        >>> notely = Notely(
-        ...     provider="openai",
-        ...     model="gpt-4o",
-        ...     temperature=0.7,
-        ...     asr_backend="funasr",
-        ...     ocr_backend="paddleocr",
-        ... )
+        # From YAML file
+        notely = Notely.from_yaml("config.yaml")
+        result = await notely.process("lecture.mp4")
+
+        # From dictionary
+        notely = Notely.from_dict({
+            "llm": {"api_key": "sk-xxx", "model": "gpt-4o"}
+        })
+        result = await notely.process("lecture.mp4")
     """
 
-    def __init__(
-        self,
-        # LLM configuration (core)
-        api_key: str,
-        provider: str = "openai",
-        model: str = "gpt-4o",
-        base_url: str = "",
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        # ASR configuration
-        asr_backend: str = "funasr",
-        asr_device: str = "cuda",
-        asr_model: str = "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
-        # OCR configuration
-        ocr_backend: str = "paddleocr",
-        ocr_lang: str = "ch",
-        # Processing settings
-        key_frame_interval_seconds: float = 5.0,
-        min_frame_similarity: float = 0.85,
-        # Other settings
-        template: Optional[str] = None,
-        verbose: bool = False,
-    ):
+    def __init__(self, config: NotelyConfig) -> None:
         """
-        Initialize Notely SDK.
+        Initialize Notely with configuration.
 
         Args:
-            api_key: LLM API key (required)
-            provider: LLM provider ("openai", "zhipu", "anthropic", etc.)
-            model: Model name (e.g., "gpt-4o", "glm-4")
-            base_url: API base URL (auto-set if not provided)
-            temperature: LLM temperature (0.0-1.0)
-            max_tokens: Maximum tokens for LLM response
-            asr_backend: ASR backend ("funasr", "whisper")
-            asr_device: Device for ASR ("cuda", "cpu")
-            asr_model: ASR model name
-            ocr_backend: OCR backend ("paddleocr")
-            ocr_lang: OCR language ("ch", "en")
-            key_frame_interval_seconds: Interval for key frame extraction
-            min_frame_similarity: Minimum similarity for frame deduplication
-            template: Note template name
-            verbose: Enable verbose logging
+            config: Notely configuration object
         """
-        # LLM configuration
-        self.provider = provider
-        self.model = model
-        self.api_key = api_key
-        self.base_url = base_url or self._get_base_url(provider)
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-
-        # ASR/OCR configuration
-        self.asr_backend = asr_backend
-        self.asr_device = asr_device
-        self.asr_model = asr_model
-        self.ocr_backend = ocr_backend
-        self.ocr_lang = ocr_lang
-
-        # Processing settings
-        self.key_frame_interval_seconds = key_frame_interval_seconds
-        self.min_frame_similarity = min_frame_similarity
-
-        # Other settings
-        self.template_name = template
-        self.verbose = verbose
+        self.config = config
 
         # Lazy-initialized backends
-        self._asr: Optional[ASRBackend] = None
-        self._ocr: Optional[OCRBackend] = None
-        self._llm: Optional[LLMBackend] = None
+        self._asr: ASRBackend | None = None
+        self._ocr: OCRBackend | None = None
+        self._enhancer: ThreeLayerEnhancer | None = None
         self._formatter = MarkdownFormatter()
 
-    @staticmethod
-    def _get_base_url(provider: str) -> str:
-        """Get default base URL for provider."""
-        provider_config = PROVIDER_DEFAULTS.get(provider, {})
-        return provider_config.get("base_url", "")
+        logger.info("Initialized Notely with configuration")
+
+    @classmethod
+    def from_yaml(cls, yaml_path: Path | str) -> Notely:
+        """
+        Create Notely from YAML configuration file.
+
+        Args:
+            yaml_path: Path to YAML configuration file
+
+        Returns:
+            Notely instance
+
+        Example:
+            notely = Notely.from_yaml("config.yaml")
+        """
+        config = NotelyConfig.from_yaml(yaml_path)
+        return cls(config)
+
+    @classmethod
+    def from_dict(cls, config_dict: dict[str, Any]) -> Notely:
+        """
+        Create Notely from configuration dictionary.
+
+        Args:
+            config_dict: Configuration dictionary
+
+        Returns:
+            Notely instance
+
+        Example:
+            notely = Notely.from_dict({
+                "llm": {"api_key": "sk-xxx", "model": "gpt-4o"}
+            })
+        """
+        config = NotelyConfig.from_dict(config_dict)
+        return cls(config)
 
     @property
     def asr(self) -> ASRBackend:
-        """Get ASR backend (lazy initialization)."""
+        """
+        Get ASR backend (lazy initialization).
+
+        Returns:
+            ASR backend instance
+        """
         if self._asr is None:
-            if self.asr_backend == "funasr":
+            if self.config.asr.backend == "funasr":
                 self._asr = FunASRBackend(
-                    model=self.asr_model,
-                    device=self.asr_device,
+                    model=self.config.asr.model,
+                    device=self.config.asr.device,
                 )
-            elif self.asr_backend == "whisper":
-                self._asr = WhisperBackend(device=self.asr_device)
             else:
-                raise ValueError(f"Unknown ASR backend: {self.asr_backend}")
+                raise ValueError(f"Unsupported ASR backend: {self.config.asr.backend}")
+
+            logger.info(f"Initialized ASR backend: {self.config.asr.backend}")
+
         return self._asr
 
     @property
     def ocr(self) -> OCRBackend:
-        """Get OCR backend (lazy initialization)."""
+        """
+        Get OCR backend (lazy initialization).
+
+        Returns:
+            OCR backend instance
+        """
         if self._ocr is None:
-            if self.ocr_backend == "paddleocr":
-                self._ocr = PaddleOCRBackend(lang=self.ocr_lang)
+            if self.config.ocr.backend == "paddleocr":
+                self._ocr = PaddleOCRBackend(
+                    lang=self.config.ocr.language,
+                    use_gpu=self.config.ocr.use_gpu,
+                )
             else:
-                raise ValueError(f"Unknown OCR backend: {self.ocr_backend}")
+                raise ValueError(f"Unsupported OCR backend: {self.config.ocr.backend}")
+
+            logger.info(f"Initialized OCR backend: {self.config.ocr.backend}")
+
         return self._ocr
 
     @property
-    def llm(self) -> LLMBackend:
-        """Get LLM backend (lazy initialization)."""
-        if self._llm is None:
-            self._llm = OpenAIBackend(
-                base_url=self.base_url,
-                api_key=self.api_key,
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-        return self._llm
-
-    def process(
-        self,
-        video_path: Union[Path, str, None] = None,
-        audio_path: Union[Path, str, None] = None,
-        pdf_paths: Union[list[Union[Path, str]], None] = None,
-        template: Union[NoteTemplate, None] = None,
-        **kwargs: Any,
-    ) -> NotelyResult:
+    def enhancer(self) -> ThreeLayerEnhancer:
         """
-        Process a lecture and generate Markdown notes.
-
-        Args:
-            video_path: Path to the lecture video file.
-            audio_path: Path to the audio file (if no video).
-            pdf_paths: Paths to PDF slides/handouts.
-            template: Custom note template for formatting.
-            **kwargs: Additional metadata (title, instructor, date, etc.)
+        Get Enhancer (lazy initialization).
 
         Returns:
-            NotelyResult containing the generated Markdown and metadata.
+            ThreeLayerEnhancer instance
         """
-        # Prepare input
-        input_data = LectureInput(
-            video_path=Path(video_path) if video_path else None,
-            audio_path=Path(audio_path) if audio_path else None,
-            pdf_paths=[Path(p) for p in pdf_paths] if pdf_paths else [],
-            metadata=kwargs,
-        )
+        if self._enhancer is None:
+            self._enhancer = ThreeLayerEnhancer.from_config(self.config.enhancer)
+            logger.info("Initialized Enhancer")
 
-        # Use default template if not provided
-        if template is None:
-            template = get_default_template()
+        return self._enhancer
+
+    async def process(
+        self,
+        input_path: Path | str,
+        metadata: dict[str, Any] | None = None,
+    ) -> NotelyResult:
+        """
+        Process input file and generate notes.
+
+        This is the main processing pipeline:
+        1. Extract audio (if video)
+        2. ASR - Transcribe speech
+        3. OCR - Extract text from slides (if video)
+        4. Enhancer - Generate structured notes
+        5. Format - Beautify Markdown
+
+        Args:
+            input_path: Path to input file (audio/video)
+            metadata: Optional metadata (title, date, etc.)
+
+        Returns:
+            NotelyResult with generated notes
+
+        Example:
+            result = await notely.process("lecture.mp4")
+            result.save("output/notes.md")
+        """
+        input_path = Path(input_path)
+        metadata = metadata or {}
+
+        logger.info("=" * 80)
+        logger.info(f"Processing: {input_path}")
+        logger.info("=" * 80)
 
         # Step 1: Extract audio from video if needed
-        audio_to_process = input_data.audio_path
-        if audio_to_process is None and input_data.video_path:
-            audio_to_process = extract_audio(input_data.video_path)
+        audio_path = input_path
+        if input_path.suffix.lower() in [".mp4", ".avi", ".mov", ".mkv"]:
+            logger.info("Extracting audio from video...")
+            audio_path = extract_audio(input_path)
+            logger.info(f"✓ Audio extracted: {audio_path}")
 
-        # Step 2: ASR - Speech to text with timestamps
-        if audio_to_process:
-            transcript = self.asr.transcribe(audio_to_process)
-        else:
-            # Create empty transcript if no audio
-            transcript = ASRResult(segments=[], duration=0.0)
+        # Step 2: ASR - Speech to text
+        logger.info("Transcribing audio...")
+        transcript = self.asr.transcribe(str(audio_path))
+        logger.info(f"✓ Transcription completed: {len(transcript.segments)} segments")
 
-        # Step 3: OCR - Extract text from video frames and PDFs
-        ocr_results = []
-
-        # Extract key frames from video
-        if input_data.video_path:
-            key_frames = extract_key_frames(
-                input_data.video_path,
-                interval_seconds=self.key_frame_interval_seconds,
-                min_similarity=self.min_frame_similarity,
+        # Step 2.5: Detect language if not explicitly set
+        if self.config.enhancer.language is None:
+            asr_hint = getattr(transcript, "language", None)
+            detected_lang = detect_transcript_language(
+                transcript.full_text,
+                asr_hint=asr_hint,
             )
-            for frame in key_frames:
-                ocr_result = self.ocr.recognize(frame.path)
-                ocr_results.append(ocr_result)
+            # Temporarily override for this processing
+            self.config.enhancer.language = detected_lang
+            logger.info(f"✓ Auto-detected language: {detected_lang}")
+        else:
+            logger.info(f"Using configured language: {self.config.enhancer.language}")
 
-        # Process PDF files
-        # TODO: Implement PDF processing
+        # Step 3: OCR - Extract text from slides (if video)
+        ocr_results: list[OCRResult] = []
+        if input_path.suffix.lower() in [".mp4", ".avi", ".mov", ".mkv"]:
+            logger.info("Extracting key frames...")
+            key_frames = extract_key_frames(str(input_path))
+            logger.info(f"✓ Extracted {len(key_frames)} key frames")
 
-        # Step 4: LLM - Generate structured notes
-        notes, thinking_process = self.llm.generate_notes(
+            if key_frames:
+                logger.info("Performing OCR on key frames...")
+                for i, frame in enumerate(key_frames):
+                    ocr_result = self.ocr.recognize(frame.path)
+                    ocr_results.append(ocr_result)
+                    logger.info(
+                        f"  Frame {i + 1}/{len(key_frames)}: {len(ocr_result.full_text)} chars"
+                    )
+                logger.info(f"✓ OCR completed: {len(ocr_results)} frames")
+
+        # Step 4: Enhancer - Generate notes (唯一入口)
+        logger.info("Generating notes with Enhancer...")
+        markdown = await self.enhancer.process(
             transcript=transcript,
             ocr_results=ocr_results,
-            template=template,
-            metadata=input_data.metadata,
+            metadata=metadata,
         )
+        logger.info(f"✓ Notes generated: {len(markdown)} characters")
 
         # Step 5: Format and beautify
-        formatted_notes = self._formatter.beautify(notes)
+        logger.info("Formatting Markdown...")
+        formatted_markdown = self._formatter.beautify(markdown)
+        logger.info("✓ Formatting completed")
 
-        return NotelyResult(
-            markdown=formatted_notes,
-            thinking_process=thinking_process,
+        # Create result
+        result = NotelyResult(
+            markdown=formatted_markdown,
+            thinking_process=f"Processed with 3-Layer Enhancer: {self.enhancer.metrics}",
             transcript=transcript,
             ocr_results=ocr_results,
-            metadata=input_data.metadata,
+            metadata=metadata,
         )
 
-    def process_audio(
+        logger.info("=" * 80)
+        logger.info("✓ Processing completed successfully")
+        logger.info("=" * 80)
+
+        return result
+
+    def process_sync(
         self,
-        audio_path: Union[Path, str],
-        template: Union[NoteTemplate, None] = None,
-        **kwargs: Any,
+        input_path: Path | str,
+        metadata: dict[str, Any] | None = None,
     ) -> NotelyResult:
         """
-        Process an audio file and generate notes.
+        Synchronous version of process().
 
         Args:
-            audio_path: Path to the audio file.
-            template: Custom note template.
-            **kwargs: Additional metadata.
+            input_path: Path to input file
+            metadata: Optional metadata
 
         Returns:
-            NotelyResult containing the generated notes.
+            NotelyResult with generated notes
         """
-        return self.process(audio_path=audio_path, template=template, **kwargs)
-
-    def process_pdf(
-        self,
-        pdf_path: Union[Path, str],
-        template: Union[NoteTemplate, None] = None,
-        **kwargs: Any,
-    ) -> NotelyResult:
-        """
-        Process a PDF file and generate notes.
-
-        Args:
-            pdf_path: Path to the PDF file.
-            template: Custom note template.
-            **kwargs: Additional metadata.
-
-        Returns:
-            NotelyResult containing the generated notes.
-        """
-        return self.process(pdf_paths=[pdf_path], template=template, **kwargs)
-
-
-# Backward compatibility: keep NotelyConfig for existing code
-class NotelyConfig:
-    """
-    Deprecated: Use Notely() constructor parameters instead.
-
-    This class is kept for backward compatibility.
-    """
-
-    def __init__(self, **kwargs):
-        import warnings
-
-        warnings.warn(
-            "NotelyConfig is deprecated. Use Notely() constructor parameters instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self.__dict__.update(kwargs)
+        return asyncio.run(self.process(input_path, metadata))

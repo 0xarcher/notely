@@ -23,6 +23,11 @@
 - 🎯 **高质量语音识别** - FunASR（中文 CER < 3%）、Whisper（多语言）
 - 📊 **智能 OCR** - PaddleOCR + 关键帧去重
 - 🤖 **多 LLM 支持** - OpenAI、智谱、Anthropic、Moonshot、DeepSeek
+- 🧠 **三层增强架构** - 理解层 → 组织层 → 格式化层
+- ✂️ **语义分块** - 智能文本分段（2000 tokens，1000 重叠）
+- 📐 **LaTeX 公式支持** - 数学符号渲染
+- 🌍 **语言自动检测** - 自动识别转录文本语言
+- ⚡ **并发处理** - 并行处理多个文本块，提升效率
 - ✨ **精美输出** - 结构化 Markdown，自动格式化
 - 🔧 **灵活配置** - 零配置启动，支持深度定制
 
@@ -55,24 +60,46 @@ sudo apt-get install ffmpeg
 ### 2. 运行示例
 
 ```python
-import os
-from notely import Notely
+from notely import Notely, NotelyConfig, EnhancerConfig, LLMConfig
 
-# 显式传入 API Key
-notely = Notely(api_key="sk-xxx")
-
-# 或从环境变量读取
-notely = Notely(api_key=os.getenv("OPENAI_API_KEY"))
-
-# 处理视频课程
-result = notely.process(
-    video_path="lecture.mp4",
-    title="机器学习基础",
-    instructor="张教授",
+# 方法 1：从配置对象创建
+config = NotelyConfig(
+    enhancer=EnhancerConfig(
+        llm=LLMConfig(
+            api_key="sk-xxx",
+            model="gpt-4o",
+        )
+    )
 )
+notely = Notely(config)
+
+# 处理视频课程（异步）
+import asyncio
+
+result = asyncio.run(notely.process("lecture.mp4"))
 
 # 保存笔记
 result.save("notes.md")
+```
+
+```python
+# 方法 2：从字典创建（更简单）
+notely = Notely.from_dict({
+    "llm": {
+        "api_key": "sk-xxx",
+        "model": "gpt-4o",
+    }
+})
+
+result = asyncio.run(notely.process("lecture.mp4"))
+result.save("notes.md")
+```
+
+```python
+# 方法 3：从 YAML 文件创建（推荐用于复杂配置）
+# 先创建 config.yaml，然后：
+notely = Notely.from_yaml("config.yaml")
+result = asyncio.run(notely.process("lecture.mp4"))
 ```
 
 ### 3. 使用流程
@@ -181,7 +208,7 @@ notely = Notely(
     provider="openai",
     model="gpt-4o",
     base_url="https://api.openai.com/v1",  # 可选
-    temperature=0.7,
+    temperature=0.3,  # 降低以提高一致性（默认：0.3）
     max_tokens=4096,
 
     # ASR 配置
@@ -192,6 +219,11 @@ notely = Notely(
     # OCR 配置
     ocr_backend="paddleocr",
     ocr_lang="ch",  # 中文用 ch，英文用 en
+
+    # 增强配置（新增）
+    chunk_size=2000,        # 最大文本块大小（tokens）（默认：2000）
+    chunk_overlap=1000,     # 文本块重叠大小（tokens）（默认：1000）
+    language=None,          # 输出语言：'zh'、'en' 或 None 自动检测
 
     # 处理配置
     key_frame_interval_seconds=5.0,  # 关键帧提取间隔
@@ -322,6 +354,23 @@ result.save("output/notes.md")
 
 ### 架构概览
 
+Notely 使用三层增强流水线将原始转录文本转换为结构化笔记：
+
+**1. 理解层（Comprehension）** - 从转录文本块中提取语义信息
+   - 每个文本块摘要最少 300 字
+   - 保留所有技术细节、公式和示例
+   - 并发处理提升效率
+
+**2. 组织层（Structuring）** - 将理解结果组织成连贯的章节
+   - 每个主要章节最少 200 字
+   - 按主题组织（非时间顺序）
+   - 跨文本块概念合并
+
+**3. 格式化层（Formatting）** - 美化 Markdown 并支持 LaTeX 公式
+   - 数学符号渲染
+   - 统一标题层级
+   - Emoji 图标增强视觉效果
+
 <p align="center">
   <img src="docs/images/architecture.png" alt="架构概览" width="800">
 </p>
@@ -331,8 +380,10 @@ result.save("output/notes.md")
 1. **输入处理** - 从视频提取音频和关键帧
 2. **ASR 转录** - 语音转文字，带时间戳（中文用 FunASR，多语言用 Whisper）
 3. **OCR 识别** - 使用 PaddleOCR 提取幻灯片/画面中的文字
-4. **LLM 生成** - 融合多模态信息，生成结构化笔记
-5. **格式化输出** - 美化 Markdown，确保可读性
+4. **语义分块** - 将转录文本切分为 2000 token 的块，1000 token 重叠
+5. **理解层处理** - 从每个文本块提取语义信息（并行处理）
+6. **组织层处理** - 将所有文本块按主题组织成连贯章节
+7. **格式化输出** - 美化 Markdown 并支持 LaTeX 公式
 
 ---
 

@@ -71,3 +71,15 @@ uv.lock
 
 # Project instructions
 CLAUDE.md
+
+# Cache
+.cache/
+
+# Test files
+test_openai.py
+test_e2e.py
+.env.test
+
+# Documentation (except images)
+docs/*.md
+docs/plans/

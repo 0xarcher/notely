@@ -1,23 +1,27 @@
 graph TB
-    A[Video/Audio Input] --> B{Input Type}
-    B -->|Video| C[Extract Audio]
-    B -->|Video| D[Extract Key Frames]
-    B -->|Audio| E[Audio File]
+    A[📹 Video/Audio Input] --> B{Input Type}
+    B -->|Video| C[🎵 Extract Audio]
+    B -->|Video| D[🖼️ Extract Key Frames]
+    B -->|Audio| E[🎵 Audio File]
 
-    C --> F[ASR Transcription]
+    C --> F[🎤 ASR Transcription<br/>FunASR/Whisper]
     E --> F
-    D --> G[OCR Recognition]
+    D --> G[👁️ OCR Recognition<br/>PaddleOCR]
 
-    F --> H[Transcript with Timestamps]
-    G --> I[Text from Slides/Frames]
+    F --> H[📝 Transcript with Timestamps]
+    G --> I[📄 Text from Slides/Frames]
 
-    H --> J[LLM Processing]
+    H --> J[✂️ Semantic Chunking<br/>Size: 2000 tokens<br/>Overlap: 1000 tokens]
     I --> J
 
-    J --> K[Generate Structured Notes]
-    K --> L[Markdown Formatter]
-    L --> M[Final Markdown Output]
+    J --> K[🧠 Layer 1: Comprehension<br/>Extract semantic info<br/>Min 300 words/chunk]
+    K --> L[📚 Layer 2: Structuring<br/>Organize into sections<br/>Min 200 words/section]
+    L --> M[✨ Markdown Formatter<br/>LaTeX formula support]
+    M --> N[📋 Final Markdown Output]
 
-    style A fill:#e1f5ff
-    style M fill:#d4edda
-    style J fill:#fff3cd
+    style A fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style N fill:#e8f5e9,stroke:#388e3c,stroke-width:3px
+    style K fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style L fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style J fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style M fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
