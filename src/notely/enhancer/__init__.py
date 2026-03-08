@@ -20,7 +20,9 @@ Example:
     >>> from notely import Notely, NotelyConfig, EnhancerConfig, LLMConfig
     >>> from notely.enhancer import ThreeLayerEnhancer
     >>>
-    >>> config = NotelyConfig(enhancer=EnhancerConfig(llm=LLMConfig(api_key="sk-xxx", model="gpt-4o")))
+    >>> config = NotelyConfig(
+    ...     enhancer=EnhancerConfig(llm=LLMConfig(api_key="sk-xxx", model="gpt-4o"))
+    ... )
     >>> notely = Notely(config)
     >>>
     >>> # result = await notely.process("audio.wav")
