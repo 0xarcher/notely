@@ -130,6 +130,12 @@ omit = [
     "*/test_*.py",
 ]
 
+[tool.coverage.paths]
+source = [
+    "src/notely",
+    "*/notely/src/notely",
+]
+
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
