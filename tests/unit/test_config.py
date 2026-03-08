@@ -29,8 +29,8 @@ def test_enhancer_config_defaults():
     llm = LLMConfig(api_key="test")
     config = EnhancerConfig(llm=llm)
 
-    assert config.chunk_size == 4000
-    assert config.chunk_overlap == 800
+    assert config.chunk_size == 2000
+    assert config.chunk_overlap == 1000
     assert config.language is None  # Auto-detect
     assert config.max_concurrent == 5
     assert config.cache_dir == Path(".cache/enhancer")

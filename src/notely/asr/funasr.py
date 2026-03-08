@@ -102,7 +102,7 @@ class FunASRBackend(ASRBackend):
                 # We need to extract sentence-level timing
                 if timestamp and isinstance(timestamp, list) and len(timestamp) > 0:
                     # Get the first and last timestamp for sentence boundaries
-                    if isinstance(timestamp[0], (list, tuple)) and len(timestamp[0]) >= 2:
+                    if isinstance(timestamp[0], list | tuple) and len(timestamp[0]) >= 2:
                         start_time = timestamp[0][0] / 1000.0  # Convert ms to seconds
                         end_time = (
                             timestamp[-1][1] / 1000.0

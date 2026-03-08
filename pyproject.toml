@@ -46,13 +46,6 @@ paddleocr = ["paddleocr>=2.7.0", "paddlepaddle>=2.5.0"]
 whisper = ["openai-whisper>=20231117"]
 pdf-fast = ["pymupdf>=1.23.0"]  # High-performance PDF (AGPL license)
 document = ["python-docx>=1.0.0", "python-pptx>=0.6.0"]  # Future: Word/PPT support
-dev = [
-    "ruff>=0.1.0",
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
-    "pytest-mock>=3.12.0",
-]
 all = [
     "funasr>=1.0.0",
     "modelscope>=1.10.0",
@@ -121,6 +114,28 @@ strict = true
 
 [dependency-groups]
 dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.1.0",
     "mypy>=1.19.1",
     "types-pyyaml>=6.0.12.20250915",
+]
+
+[tool.coverage.run]
+source = ["src/notely"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
 ]
