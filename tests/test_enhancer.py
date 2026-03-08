@@ -37,7 +37,30 @@ from notely.enhancer import (
 def mock_llm():
     """Mock LLM backend."""
     llm = Mock()
-    llm.generate = Mock()
+    # Store custom side effect
+    _custom_side_effect = [None]
+
+    # Make generate a proper callable that works with asyncio.to_thread
+    def generate_func(*args, **kwargs):
+        # Check if a custom side_effect function was set
+        if _custom_side_effect[0] is not None:
+            if callable(_custom_side_effect[0]):
+                return _custom_side_effect[0](*args, **kwargs)
+            elif isinstance(_custom_side_effect[0], Exception):
+                raise _custom_side_effect[0]
+        # Check if _side_effect_values is set and has values
+        if hasattr(llm.generate, '_side_effect_values') and llm.generate._side_effect_values:
+            return llm.generate._side_effect_values.pop(0)
+        # Check if return_value is set
+        if hasattr(llm.generate, 'return_value') and llm.generate.return_value is not None:
+            return llm.generate.return_value
+        # Default return
+        return "{}"
+
+    llm.generate = Mock(side_effect=generate_func)
+    llm.generate._side_effect_values = []
+    llm.generate._custom_side_effect = _custom_side_effect
+    llm.generate.return_value = None
     return llm
 
 
@@ -366,7 +389,7 @@ class TestComprehensionAgent:
                 }
             )
 
-        mock_llm.generate.side_effect = side_effect
+        mock_llm.generate._custom_side_effect[0] = side_effect
 
         agent = ComprehensionAgent(mock_llm, language="zh", max_retries=1)
 
@@ -416,7 +439,7 @@ class TestStructuringAgent:
     @pytest.mark.asyncio
     async def test_fallback_on_failure(self, mock_llm, sample_comprehension):
         """Test fallback mechanism on failure."""
-        mock_llm.generate.side_effect = Exception("Simulated failure")
+        mock_llm.generate._custom_side_effect[0] = Exception("Simulated failure")
 
         agent = StructuringAgent(mock_llm, language="zh", max_retries=1)
         note = await agent.structure(
@@ -455,8 +478,8 @@ class TestThreeLayerEnhancer:
     @pytest.mark.asyncio
     async def test_full_pipeline(self, mock_llm, mock_transcript, tmp_path):
         """Test complete pipeline."""
-        # Return strings directly, not Mock objects
-        mock_llm.generate.side_effect = [
+        # Set up mock responses using the new structure
+        mock_llm.generate._side_effect_values = [
             json.dumps(
                 {
                     "summary": "机器学习基础知识",
@@ -514,8 +537,8 @@ class TestThreeLayerEnhancer:
         segment.end_time = 5.0
         transcript.segments = [segment]
 
-        # Return strings directly, not Mock objects
-        mock_llm.generate.side_effect = [
+        # Set up mock responses using the new structure
+        mock_llm.generate._side_effect_values = [
             json.dumps(
                 {
                     "summary": "ML basics with sufficient length for validation",
@@ -554,8 +577,8 @@ class TestThreeLayerEnhancer:
     @pytest.mark.asyncio
     async def test_caching(self, mock_llm, mock_transcript, tmp_path):
         """Test caching functionality."""
-        # Return strings directly, not Mock objects
-        mock_llm.generate.side_effect = [
+        # Set up mock responses using the new structure
+        mock_llm.generate._side_effect_values = [
             json.dumps(
                 {
                     "summary": "Test summary with sufficient length for validation",
@@ -602,8 +625,8 @@ class TestThreeLayerEnhancer:
     @pytest.mark.asyncio
     async def test_progress_callback(self, mock_llm, mock_transcript, tmp_path):
         """Test progress callback."""
-        # Return strings directly, not Mock objects
-        mock_llm.generate.side_effect = [
+        # Set up mock responses using the new structure
+        mock_llm.generate._side_effect_values = [
             json.dumps(
                 {
                     "summary": "Test summary with sufficient length for validation",
@@ -691,7 +714,7 @@ class TestThreeLayerEnhancer:
             }
         )
 
-        mock_llm.generate.side_effect = [comp_json] * 50 + [struct_json]
+        mock_llm.generate._side_effect_values = [comp_json] * 50 + [struct_json]
 
         enhancer = ThreeLayerEnhancer(
             llm=mock_llm,
@@ -766,7 +789,7 @@ class TestIntegration:
             ensure_ascii=False,
         )
 
-        mock_llm.generate.side_effect = [comp_json] * 20 + [
+        mock_llm.generate._side_effect_values = [comp_json] * 20 + [
             struct_json
         ]  # Increased to handle more chunks
 
