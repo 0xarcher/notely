@@ -49,10 +49,10 @@ def mock_llm():
             elif isinstance(_custom_side_effect[0], Exception):
                 raise _custom_side_effect[0]
         # Check if _side_effect_values is set and has values
-        if hasattr(llm.generate, '_side_effect_values') and llm.generate._side_effect_values:
+        if hasattr(llm.generate, "_side_effect_values") and llm.generate._side_effect_values:
             return llm.generate._side_effect_values.pop(0)
         # Check if return_value is set
-        if hasattr(llm.generate, 'return_value') and llm.generate.return_value is not None:
+        if hasattr(llm.generate, "return_value") and llm.generate.return_value is not None:
             return llm.generate.return_value
         # Default return
         return "{}"
