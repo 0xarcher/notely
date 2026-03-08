@@ -1,0 +1,31 @@
+# Notely Configuration Example
+
+# ASR (Automatic Speech Recognition) Configuration
+asr:
+  backend: funasr  # Options: funasr, whisper
+  model: iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch
+  device: cuda  # Options: cuda, cpu
+  language: zh  # Options: zh, en
+
+# OCR (Optical Character Recognition) Configuration
+ocr:
+  backend: paddleocr  # Options: paddleocr, tesseract
+  language: ch  # Options: ch, en
+  use_gpu: true
+
+# LLM Configuration
+llm:
+  provider: openai  # Options: openai, anthropic, zhipu, moonshot, deepseek
+  model: gpt-4o  # Model identifier
+  api_key: YOUR_API_KEY_HERE  # Replace with your actual API key
+  base_url: https://api.openai.com/v1  # API endpoint (auto-set if not provided)
+  temperature: 0.7  # Sampling temperature (0.0-2.0)
+  max_tokens: 4096  # Maximum tokens in response
+
+# Enhancer Configuration
+enhancer:
+  chunk_size: 4000  # Maximum chunk size in tokens
+  chunk_overlap: 800  # Overlap between chunks in tokens
+  language: zh  # Output language (zh or en, null for auto-detect)
+  max_concurrent: 5  # Maximum concurrent API calls
+  # cache_dir: .cache/enhancer  # Cache directory (optional)
