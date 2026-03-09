@@ -33,6 +33,7 @@ dependencies = [
     "tenacity>=8.0.0", # Retry logic with exponential backoff
     "hatchling>=1.29.0",
     "fast-langdetect>=0.2.0", # Language detection with fastText
+    "zhipuai>=2.0.0", # Zhipu AI official SDK
 ]
 
 [project.optional-dependencies]
