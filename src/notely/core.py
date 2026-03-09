@@ -124,7 +124,6 @@ class Notely:
             if self.config.asr.backend == "funasr":
                 self._asr = FunASRBackend(
                     model=self.config.asr.model,
-                    device=self.config.asr.device,
                 )
             else:
                 raise ValueError(f"Unsupported ASR backend: {self.config.asr.backend}")
