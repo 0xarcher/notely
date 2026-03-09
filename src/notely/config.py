@@ -39,6 +39,8 @@ class LLMConfig:
                 self.base_url = "https://api.openai.com/v1"
             elif self.provider == "anthropic":
                 self.base_url = "https://api.anthropic.com/v1"
+            elif self.provider == "zhipu":
+                self.base_url = "https://open.bigmodel.cn/api/paas/v4"
             # Add more providers as needed
 
 
@@ -77,13 +79,11 @@ class ASRConfig:
     Attributes:
         backend: ASR backend name (e.g., 'funasr', 'whisper')
         model: Model identifier
-        device: Device for inference ('cuda', 'cpu')
         language: Language code (e.g., 'zh', 'en')
     """
 
     backend: str = "funasr"
     model: str = "paraformer-zh"
-    device: str = "cuda"
     language: str = "zh"
 
 
@@ -93,12 +93,18 @@ class OCRConfig:
     OCR (Optical Character Recognition) configuration.
 
     Attributes:
-        backend: OCR backend name (e.g., 'paddleocr', 'tesseract')
+        provider: OCR provider name (e.g., 'paddleocr', 'zhipu')
+        model: Model identifier (e.g., 'glm-4v-flash' for Zhipu)
+        api_key: API key for cloud providers
+        base_url: Base URL for API endpoint
         language: Language code (e.g., 'ch', 'en')
-        use_gpu: Whether to use GPU acceleration
+        use_gpu: Whether to use GPU acceleration (for local providers)
     """
 
-    backend: str = "paddleocr"
+    provider: str = "paddleocr"
+    model: str = "glm-4v-flash"
+    api_key: str = ""
+    base_url: str = ""
     language: str = "ch"
     use_gpu: bool = True
 
@@ -200,11 +206,13 @@ class NotelyConfig:
             "asr": {
                 "backend": self.asr.backend,
                 "model": self.asr.model,
-                "device": self.asr.device,
                 "language": self.asr.language,
             },
             "ocr": {
-                "backend": self.ocr.backend,
+                "provider": self.ocr.provider,
+                "model": self.ocr.model,
+                "api_key": self.ocr.api_key,
+                "base_url": self.ocr.base_url,
                 "language": self.ocr.language,
                 "use_gpu": self.ocr.use_gpu,
             },

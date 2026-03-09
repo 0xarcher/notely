@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from notely.config import EnhancerConfig, LLMConfig, NotelyConfig
+from notely.config import ASRConfig, EnhancerConfig, LLMConfig, NotelyConfig, OCRConfig
 
 
 def test_llm_config_defaults():
@@ -24,6 +24,53 @@ def test_llm_config_custom_provider():
     assert config.base_url == "https://api.anthropic.com/v1"
 
 
+def test_llm_config_zhipu_provider():
+    """Test LLMConfig with Zhipu provider."""
+    config = LLMConfig(
+        provider="zhipu",
+        model="glm-4",
+        api_key="test-key",
+        base_url="https://open.bigmodel.cn/api/paas/v4",
+    )
+    assert config.provider == "zhipu"
+    assert config.model == "glm-4"
+
+
+def test_llm_config_zhipu_default_url():
+    """Test LLMConfig with Zhipu provider gets default URL."""
+    config = LLMConfig(provider="zhipu", api_key="test-key")
+    assert config.base_url == "https://open.bigmodel.cn/api/paas/v4"
+
+
+def test_ocr_config_defaults():
+    """Test OCRConfig default values."""
+    config = OCRConfig()
+    assert config.provider == "paddleocr"
+    assert config.language == "ch"
+    assert config.use_gpu is True
+
+
+def test_ocr_config_zhipu_provider():
+    """Test OCRConfig with Zhipu provider."""
+    config = OCRConfig(
+        provider="zhipu",
+        model="glm-4v-flash",
+        api_key="test-key",
+        base_url="https://open.bigmodel.cn/api/paas/v4",
+    )
+    assert config.provider == "zhipu"
+    assert config.model == "glm-4v-flash"
+    assert config.api_key == "test-key"
+
+
+def test_asr_config_no_device():
+    """Test ASRConfig has no device field (auto-detected)."""
+    config = ASRConfig()
+    assert not hasattr(config, "device")
+    assert config.backend == "funasr"
+    assert config.model == "paraformer-zh"
+
+
 def test_enhancer_config_defaults():
     """Test EnhancerConfig default values."""
     llm = LLMConfig(api_key="test")
@@ -39,8 +86,8 @@ def test_enhancer_config_defaults():
 def test_notely_config_from_dict():
     """Test creating NotelyConfig from dictionary."""
     config_dict = {
-        "asr": {"backend": "funasr", "device": "cuda"},
-        "ocr": {"backend": "paddleocr", "use_gpu": True},
+        "asr": {"backend": "funasr"},
+        "ocr": {"provider": "paddleocr", "use_gpu": True},
         "llm": {"model": "gpt-4o", "api_key": "sk-test"},
         "enhancer": {"chunk_size": 4000, "language": "zh"},
     }
@@ -48,17 +95,32 @@ def test_notely_config_from_dict():
     config = NotelyConfig.from_dict(config_dict)
 
     assert config.asr.backend == "funasr"
-    assert config.asr.device == "cuda"
-    assert config.ocr.backend == "paddleocr"
+    assert config.ocr.provider == "paddleocr"
     assert config.enhancer.llm.model == "gpt-4o"
     assert config.enhancer.language == "zh"
+
+
+def test_notely_config_from_dict_with_zhipu():
+    """Test creating NotelyConfig with Zhipu provider."""
+    config_dict = {
+        "asr": {"backend": "funasr"},
+        "ocr": {"provider": "zhipu", "model": "glm-4v-flash", "api_key": "test"},
+        "llm": {"provider": "zhipu", "model": "glm-4", "api_key": "test"},
+    }
+
+    config = NotelyConfig.from_dict(config_dict)
+
+    assert config.ocr.provider == "zhipu"
+    assert config.ocr.model == "glm-4v-flash"
+    assert config.enhancer.llm.provider == "zhipu"
+    assert config.enhancer.llm.model == "glm-4"
 
 
 def test_notely_config_from_yaml():
     """Test creating NotelyConfig from YAML file."""
     config_dict = {
         "asr": {"backend": "funasr"},
-        "ocr": {"backend": "paddleocr"},
+        "ocr": {"provider": "paddleocr"},
         "llm": {"api_key": "test", "model": "gpt-4o"},
     }
 
@@ -79,7 +141,7 @@ def test_notely_config_to_dict():
     config = NotelyConfig.from_dict(
         {
             "asr": {"backend": "funasr"},
-            "ocr": {"backend": "paddleocr"},
+            "ocr": {"provider": "paddleocr"},
             "llm": {"api_key": "test", "model": "gpt-4o"},
         }
     )
@@ -87,5 +149,7 @@ def test_notely_config_to_dict():
     config_dict = config.to_dict()
 
     assert config_dict["asr"]["backend"] == "funasr"
+    assert config_dict["ocr"]["provider"] == "paddleocr"
     assert config_dict["llm"]["model"] == "gpt-4o"
     assert "api_key" in config_dict["llm"]
+    assert "device" not in config_dict["asr"]  # device field removed

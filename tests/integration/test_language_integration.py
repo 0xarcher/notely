@@ -32,7 +32,7 @@ def test_auto_detect_language_from_transcript():
     # Create config with language=None (auto-detect)
     config = NotelyConfig(
         asr=ASRConfig(backend="funasr"),
-        ocr=OCRConfig(backend="paddleocr"),
+        ocr=OCRConfig(provider="paddleocr"),
         enhancer=EnhancerConfig(
             llm=LLMConfig(api_key="test", model="gpt-4o"),
             language=None,  # Auto-detect
@@ -82,7 +82,7 @@ def test_explicit_language_not_overridden():
     # Create config with explicit language='en'
     config = NotelyConfig(
         asr=ASRConfig(backend="funasr"),
-        ocr=OCRConfig(backend="paddleocr"),
+        ocr=OCRConfig(provider="paddleocr"),
         enhancer=EnhancerConfig(
             llm=LLMConfig(api_key="test", model="gpt-4o"),
             language="en",  # Explicitly set to English
@@ -121,7 +121,7 @@ def test_english_transcript_detection():
 
     config = NotelyConfig(
         asr=ASRConfig(backend="funasr"),
-        ocr=OCRConfig(backend="paddleocr"),
+        ocr=OCRConfig(provider="paddleocr"),
         enhancer=EnhancerConfig(
             llm=LLMConfig(api_key="test", model="gpt-4o"),
             language=None,  # Auto-detect
