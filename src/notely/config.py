@@ -102,11 +102,24 @@ class OCRConfig:
     """
 
     provider: str = "paddleocr"
-    model: str = "glm-4v-flash"
+    model: str = ""
     api_key: str = ""
     base_url: str = ""
     language: str = "ch"
     use_gpu: bool = True
+
+    def __post_init__(self) -> None:
+        """Set provider-specific defaults and validate required fields."""
+        if self.provider == "zhipu":
+            if not self.model:
+                self.model = "glm-4v-flash"
+            if not self.base_url:
+                self.base_url = "https://open.bigmodel.cn/api/paas/v4"
+            if not self.api_key:
+                raise ValueError("api_key is required for Zhipu OCR provider")
+        elif self.provider == "paddleocr":
+            if not self.model:
+                self.model = "PP-OCRv4"
 
 
 @dataclass

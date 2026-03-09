@@ -43,11 +43,14 @@ def test_llm_config_zhipu_default_url():
 
 
 def test_ocr_config_defaults():
-    """Test OCRConfig default values."""
+    """Test OCRConfig default values for paddleocr provider."""
     config = OCRConfig()
     assert config.provider == "paddleocr"
+    assert config.model == "PP-OCRv4"  # Auto-filled default
     assert config.language == "ch"
     assert config.use_gpu is True
+    assert config.api_key == ""  # Not required for local provider
+    assert config.base_url == ""  # Not required for local provider
 
 
 def test_ocr_config_zhipu_provider():
@@ -61,6 +64,21 @@ def test_ocr_config_zhipu_provider():
     assert config.provider == "zhipu"
     assert config.model == "glm-4v-flash"
     assert config.api_key == "test-key"
+
+
+def test_ocr_config_zhipu_auto_defaults():
+    """Test OCRConfig with Zhipu provider gets auto-filled defaults."""
+    config = OCRConfig(provider="zhipu", api_key="test-key")
+    assert config.model == "glm-4v-flash"  # Auto-filled
+    assert config.base_url == "https://open.bigmodel.cn/api/paas/v4"  # Auto-filled
+
+
+def test_ocr_config_zhipu_requires_api_key():
+    """Test OCRConfig with Zhipu provider requires api_key."""
+    import pytest
+
+    with pytest.raises(ValueError, match="api_key is required"):
+        OCRConfig(provider="zhipu")
 
 
 def test_asr_config_no_device():
