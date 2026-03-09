@@ -141,15 +141,15 @@ class Notely:
             OCR backend instance
         """
         if self._ocr is None:
-            if self.config.ocr.backend == "paddleocr":
+            if self.config.ocr.provider == "paddleocr":
                 self._ocr = PaddleOCRBackend(
                     lang=self.config.ocr.language,
                     use_gpu=self.config.ocr.use_gpu,
                 )
             else:
-                raise ValueError(f"Unsupported OCR backend: {self.config.ocr.backend}")
+                raise ValueError(f"Unsupported OCR backend: {self.config.ocr.provider}")
 
-            logger.info(f"Initialized OCR backend: {self.config.ocr.backend}")
+            logger.info(f"Initialized OCR backend: {self.config.ocr.provider}")
 
         return self._ocr
 
