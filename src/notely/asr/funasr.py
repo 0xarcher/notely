@@ -4,10 +4,13 @@ FunASR backend for ASR - Alibaba's high-quality Chinese ASR model.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from notely.asr.base import ASRBackend, ASRResult, TranscriptSegment
+
+logger = logging.getLogger(__name__)
 
 
 class FunASRBackend(ASRBackend):
@@ -20,9 +23,10 @@ class FunASRBackend(ASRBackend):
     - Speaker diarization
     - Punctuation restoration
 
+    Device is auto-detected: CUDA if available, otherwise CPU.
+
     Args:
         model: Model name or path. Defaults to Paraformer-large.
-        device: Device to use ("cuda" or "cpu").
         use_vad: Whether to use voice activity detection.
         use_punc: Whether to use punctuation restoration.
         use_spk: Whether to use speaker diarization.
@@ -31,11 +35,20 @@ class FunASRBackend(ASRBackend):
     def __init__(
         self,
         model: str = "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
-        device: str = "cuda",
         use_vad: bool = True,
         use_punc: bool = True,
         use_spk: bool = False,
     ):
+        # Auto-detect GPU availability
+        try:
+            import torch
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        except ImportError:
+            device = "cpu"
+
+        logger.info(f"FunASR using device: {device}")
+
         self.model_name = model
         self.device = device
         self.use_vad = use_vad
