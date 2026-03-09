@@ -136,7 +136,7 @@ class ThreeLayerEnhancer:
 
     async def process(
         self,
-        transcript: ASRResult,
+        transcript: ASRResult | None,
         ocr_results: list[OCRResult] | None = None,
         metadata: dict[Any, Any] | None = None,
     ) -> str:
@@ -144,7 +144,7 @@ class ThreeLayerEnhancer:
         Process transcript and generate structured notes.
 
         Args:
-            transcript: ASR transcription result
+            transcript: ASR transcription result (None for PDF/image processing)
             ocr_results: Optional OCR results
             metadata: Optional metadata (title, date, etc.)
 
@@ -152,6 +152,7 @@ class ThreeLayerEnhancer:
             Markdown formatted notes
 
         Raises:
+            ValueError: If both transcript and ocr_results are None
             Exception: If processing fails completely
         """
         logger.info("=" * 80)
@@ -182,7 +183,7 @@ class ThreeLayerEnhancer:
                 return cached
 
             # Layer 1: Semantic Chunking
-            chunks = self._semantic_chunking(transcript)
+            chunks = self._semantic_chunking(transcript, full_text)
             self.metrics.chunks_total = len(chunks)
             logger.info(f"Layer 1: Created {len(chunks)} semantic chunks")
             self._update_progress(ProcessingStage.COMPREHENSION)
@@ -224,26 +225,34 @@ class ThreeLayerEnhancer:
 
     def _prepare_input(
         self,
-        transcript: ASRResult,
+        transcript: ASRResult | None,
         ocr_results: list[OCRResult] | None,
         metadata: dict[Any, Any] | None,
     ) -> tuple[str, dict[Any, Any]]:
         """Prepare input text and metadata."""
-        # Merge transcript and OCR
-        full_text = transcript.full_text
+        # Start with transcript or empty
+        full_text = transcript.full_text if transcript else ""
 
+        # Add OCR content
         if ocr_results:
             ocr_text = "\n\n".join([ocr.full_text for ocr in ocr_results if ocr.full_text])
             if ocr_text:
-                full_text += f"\n\n## OCR Content\n\n{ocr_text}"
+                if full_text:
+                    full_text += f"\n\n## OCR Content\n\n{ocr_text}"
+                else:
+                    full_text = ocr_text
+
+        # Validate we have content to process
+        if not full_text.strip():
+            raise ValueError("No content to process: both transcript and OCR results are empty")
 
         # Prepare metadata
         final_metadata = metadata or {}
         final_metadata.setdefault("title", "Course Notes")
-        final_metadata.setdefault("source", "audio")
+        final_metadata.setdefault("source", "document" if not transcript else "audio")
 
         # Add duration if available
-        if transcript.segments:
+        if transcript and transcript.segments:
             duration_sec = transcript.segments[-1].end_time
             final_metadata["duration"] = f"{int(duration_sec // 60)}min"
 
@@ -268,7 +277,9 @@ class ThreeLayerEnhancer:
         if self.structuring_agent is None:
             self.structuring_agent = StructuringAgent(self.llm, language=self.language or "en")
 
-    def _semantic_chunking(self, transcript: ASRResult) -> list[SemanticChunk]:
+    def _semantic_chunking(
+        self, transcript: ASRResult | None, full_text: str
+    ) -> list[SemanticChunk]:
         """
         Perform semantic chunking with intelligent boundary detection.
 
@@ -277,8 +288,26 @@ class ThreeLayerEnhancer:
         - Add 20% overlap between chunks for context preservation
         - Add previous/next context for cross-chunk information
         - Use tiktoken for accurate token counting
-        """
 
+        For documents (no transcript): chunk by paragraphs/sentences
+        For audio/video (with transcript): chunk by transcript segments
+
+        Args:
+            transcript: ASR result with segments (None for documents)
+            full_text: Full text content to chunk
+
+        Returns:
+            List of semantic chunks
+        """
+        # Handle document processing (no transcript)
+        if transcript is None:
+            return self._chunk_text_only(full_text)
+
+        # Handle audio/video processing (with transcript)
+        return self._chunk_transcript(transcript)
+
+    def _chunk_transcript(self, transcript: ASRResult) -> list[SemanticChunk]:
+        """Chunk transcript by segments."""
         chunks: list[SemanticChunk] = []
         current_text: list[str] = []
         current_start: float = 0.0
@@ -339,6 +368,75 @@ class ThreeLayerEnhancer:
         # Add context for cross-chunk information preservation
         self._add_chunk_context(chunks)
 
+        return chunks
+
+    def _chunk_text_only(self, full_text: str) -> list[SemanticChunk]:
+        """
+        Chunk text content without transcript segments.
+
+        Used for document processing (PDF/images).
+
+        Args:
+            full_text: Full text content to chunk.
+
+        Returns:
+            List of SemanticChunk objects.
+        """
+        chunks: list[SemanticChunk] = []
+
+        # Split by paragraphs (double newlines)
+        paragraphs = full_text.split("\n\n")
+
+        current_text: list[str] = []
+        current_tokens = 0
+        chunk_index = 0
+
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+
+            para_tokens = len(self.encoding.encode(para))
+
+            if current_tokens + para_tokens > self.chunk_size and current_text:
+                # Create chunk
+                chunk_text = "\n\n".join(current_text)
+                if chunk_text.strip():
+                    chunks.append(
+                        SemanticChunk(
+                            text=chunk_text,
+                            start_time=0.0,
+                            end_time=0.0,
+                            index=chunk_index,
+                        )
+                    )
+                    chunk_index += 1
+
+                # Start new chunk with overlap
+                overlap_text = self._get_text_for_tokens(chunk_text, self.chunk_overlap)
+                current_text = [overlap_text, para] if overlap_text else [para]
+                current_tokens = sum(len(self.encoding.encode(t)) for t in current_text)
+            else:
+                current_text.append(para)
+                current_tokens += para_tokens
+
+        # Save last chunk
+        if current_text:
+            chunk_text = "\n\n".join(current_text)
+            if chunk_text.strip():
+                chunks.append(
+                    SemanticChunk(
+                        text=chunk_text,
+                        start_time=0.0,
+                        end_time=0.0,
+                        index=chunk_index,
+                    )
+                )
+
+        # Add context for cross-chunk information preservation
+        self._add_chunk_context(chunks)
+
+        logger.info(f"Created {len(chunks)} chunks from document text")
         return chunks
 
     def _get_text_for_tokens(self, text: str, target_tokens: int) -> str:

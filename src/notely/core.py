@@ -175,6 +175,54 @@ class Notely:
         """
         Process input file and generate notes.
 
+        Supports: audio, video, PDF, images
+
+        Args:
+            input_path: Path to input file
+            metadata: Optional metadata (title, date, etc.)
+
+        Returns:
+            NotelyResult with generated notes
+
+        Raises:
+            ValueError: If file type is not supported
+
+        Example:
+            result = await notely.process("lecture.mp4")
+            result.save("output/notes.md")
+        """
+        input_path = Path(input_path)
+        suffix = input_path.suffix.lower()
+        metadata = metadata or {}
+
+        # Audio files
+        if suffix in [".wav", ".mp3", ".m4a"] or suffix in [".mp4", ".avi", ".mov", ".mkv"]:
+            return await self._process_audio_video(input_path, metadata)
+
+        # PDF files
+        elif suffix == ".pdf":
+            return await self._process_pdf(input_path, metadata)
+
+        # Image files
+        elif suffix in [".jpg", ".jpeg", ".png", ".bmp"]:
+            return await self._process_image(input_path, metadata)
+
+        else:
+            raise ValueError(
+                f"Unsupported file type: {suffix}. "
+                f"Supported: audio (.wav, .mp3, .m4a), "
+                f"video (.mp4, .avi, .mov, .mkv), "
+                f"PDF (.pdf), images (.jpg, .jpeg, .png, .bmp)"
+            )
+
+    async def _process_audio_video(
+        self,
+        input_path: Path,
+        metadata: dict[str, Any] | None = None,
+    ) -> NotelyResult:
+        """
+        Process audio/video file.
+
         This is the main processing pipeline:
         1. Extract audio (if video)
         2. ASR - Transcribe speech
@@ -188,12 +236,7 @@ class Notely:
 
         Returns:
             NotelyResult with generated notes
-
-        Example:
-            result = await notely.process("lecture.mp4")
-            result.save("output/notes.md")
         """
-        input_path = Path(input_path)
         metadata = metadata or {}
 
         logger.info("=" * 80)
@@ -267,6 +310,114 @@ class Notely:
 
         logger.info("=" * 80)
         logger.info("✓ Processing completed successfully")
+        logger.info("=" * 80)
+
+        return result
+
+    async def _process_pdf(
+        self,
+        pdf_path: Path,
+        metadata: dict[str, Any] | None = None,
+    ) -> NotelyResult:
+        """
+        Process PDF file using GLM-OCR.
+
+        Args:
+            pdf_path: Path to PDF file
+            metadata: Optional metadata
+
+        Returns:
+            NotelyResult with generated notes
+        """
+        metadata = metadata or {}
+
+        logger.info("=" * 80)
+        logger.info(f"Processing PDF: {pdf_path}")
+        logger.info("=" * 80)
+
+        # OCR PDF
+        logger.info("Performing OCR on PDF...")
+        ocr_results = self.ocr.recognize_pdf(pdf_path)
+        logger.info(f"✓ OCR completed: {len(ocr_results)} pages/sections")
+
+        # Generate notes with enhancer
+        logger.info("Generating notes with Enhancer...")
+        markdown = await self.enhancer.process(
+            transcript=None,
+            ocr_results=ocr_results,
+            metadata=metadata,
+        )
+        logger.info(f"✓ Notes generated: {len(markdown)} characters")
+
+        # Format
+        logger.info("Formatting Markdown...")
+        formatted = self._formatter.beautify(markdown)
+        logger.info("✓ Formatting completed")
+
+        result = NotelyResult(
+            markdown=formatted,
+            thinking_process=f"Processed PDF: {pdf_path.name}",
+            transcript=None,
+            ocr_results=ocr_results,
+            metadata=metadata,
+        )
+
+        logger.info("=" * 80)
+        logger.info("✓ PDF processing completed successfully")
+        logger.info("=" * 80)
+
+        return result
+
+    async def _process_image(
+        self,
+        image_path: Path,
+        metadata: dict[str, Any] | None = None,
+    ) -> NotelyResult:
+        """
+        Process image file using GLM-OCR.
+
+        Args:
+            image_path: Path to image file
+            metadata: Optional metadata
+
+        Returns:
+            NotelyResult with generated notes
+        """
+        metadata = metadata or {}
+
+        logger.info("=" * 80)
+        logger.info(f"Processing image: {image_path}")
+        logger.info("=" * 80)
+
+        # OCR image
+        logger.info("Performing OCR on image...")
+        ocr_result = self.ocr.recognize(image_path)
+        logger.info(f"✓ OCR completed: {len(ocr_result.full_text)} characters")
+
+        # Generate notes
+        logger.info("Generating notes with Enhancer...")
+        markdown = await self.enhancer.process(
+            transcript=None,
+            ocr_results=[ocr_result],
+            metadata=metadata,
+        )
+        logger.info(f"✓ Notes generated: {len(markdown)} characters")
+
+        # Format
+        logger.info("Formatting Markdown...")
+        formatted = self._formatter.beautify(markdown)
+        logger.info("✓ Formatting completed")
+
+        result = NotelyResult(
+            markdown=formatted,
+            thinking_process=f"Processed image: {image_path.name}",
+            transcript=None,
+            ocr_results=[ocr_result],
+            metadata=metadata,
+        )
+
+        logger.info("=" * 80)
+        logger.info("✓ Image processing completed successfully")
         logger.info("=" * 80)
 
         return result

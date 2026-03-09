@@ -45,7 +45,7 @@ class NotelyResult:
 
     markdown: str
     thinking_process: str
-    transcript: ASRResult
+    transcript: ASRResult | None
     ocr_results: list[OCRResult]
     metadata: dict[str, Any] = field(default_factory=dict)
 
