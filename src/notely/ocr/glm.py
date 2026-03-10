@@ -7,6 +7,7 @@ This module provides OCR functionality using Zhipu AI's GLM-4V vision model.
 from __future__ import annotations
 
 import base64
+import io
 import logging
 from pathlib import Path
 
@@ -77,13 +78,12 @@ class GLMOCRBackend(OCRBackend):
         with open(file_path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
 
-    def _call_api(self, image_base64: str, file_type: str = "image") -> str:
+    def _call_api(self, image_base64: str) -> str:
         """
         Call GLM-4V API to extract text from image.
 
         Args:
-            image_base64: Base64 encoded image data.
-            file_type: Type of file ('image' or 'pdf').
+            image_base64: Base64 encoded image data (PNG/JPEG).
 
         Returns:
             Extracted text content.
@@ -92,15 +92,9 @@ class GLMOCRBackend(OCRBackend):
             RuntimeError: If API call fails.
         """
         try:
-            # Determine MIME type based on file type
-            if file_type == "pdf":
-                mime_type = "application/pdf"
-            else:
-                # Default to JPEG for images
-                mime_type = "image/jpeg"
-
             # Construct the image URL with base64 data
-            image_url = f"data:{mime_type};base64,{image_base64}"
+            # Use PNG MIME type since we convert PDF pages to PNG
+            image_url = f"data:image/png;base64,{image_base64}"
 
             # Call GLM-4V API
             response = self.client.chat.completions.create(
@@ -150,7 +144,7 @@ class GLMOCRBackend(OCRBackend):
         image_base64 = self._encode_file(image_path)
 
         # Call API
-        text_content = self._call_api(image_base64, file_type="image")
+        text_content = self._call_api(image_base64)
 
         # Create TextBlock from result
         text_block = TextBlock(
@@ -170,18 +164,19 @@ class GLMOCRBackend(OCRBackend):
         """
         Recognize text in a PDF file.
 
-        This method sends the entire PDF to the GLM-4V API for processing.
-        Note: GLM-4V processes the PDF as a whole, so we return a single
-        OCRResult with page_number set to None.
+        This method converts each PDF page to an image and sends it to the
+        GLM-4V API for OCR. GLM-4V doesn't support direct PDF input, so we
+        convert pages to images first.
 
         Args:
             pdf_path: Path to the PDF file.
 
         Returns:
-            List of OCRResult, one per detected page or section.
+            List of OCRResult, one per page.
 
         Raises:
             FileNotFoundError: If the PDF file does not exist.
+            ImportError: If pdfplumber is not installed.
             RuntimeError: If API call fails.
         """
         pdf_path = Path(pdf_path)
@@ -190,30 +185,67 @@ class GLMOCRBackend(OCRBackend):
 
         logger.debug(f"Recognizing text in PDF: {pdf_path}")
 
-        # Encode PDF to base64
-        pdf_base64 = self._encode_file(pdf_path)
+        try:
+            import pdfplumber
+        except ImportError as e:
+            raise ImportError(
+                "pdfplumber is required for PDF processing. Install it with: uv add pdfplumber"
+            ) from e
 
-        # Call API
-        text_content = self._call_api(pdf_base64, file_type="pdf")
+        results: list[OCRResult] = []
 
-        # Create TextBlock from result
-        text_block = TextBlock(
-            text=text_content,
-            confidence=1.0,  # GLM-4V doesn't provide confidence scores
-            bbox=(0, 0, 0, 0),  # No bbox info from API
-            block_type="text",
-        )
+        with pdfplumber.open(pdf_path) as pdf:
+            total_pages = len(pdf.pages)
+            logger.info(f"Processing PDF with {total_pages} pages")
 
-        # Return single result for the entire PDF
-        # In the future, we could split by page if the API supports it
-        result = OCRResult(
-            text_blocks=[text_block],
-            source_path=str(pdf_path),
-            page_number=None,
-            metadata={"model": self.model, "provider": "zhipu"},
-        )
+            for page_num, page in enumerate(pdf.pages, start=1):
+                logger.debug(f"Processing page {page_num}/{total_pages}")
 
-        return [result]
+                # Convert page to image
+                # pdfplumber's to_image() returns a PageImage object
+                page_image = page.to_image(resolution=150)
+
+                # Convert to PIL Image and then to bytes
+                pil_image = page_image.original
+
+                # Save to bytes buffer
+                buffer = io.BytesIO()
+                pil_image.save(buffer, format="PNG")
+                image_bytes = buffer.getvalue()
+
+                # Encode to base64
+                image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+
+                # Call API for this page
+                try:
+                    text_content = self._call_api(image_base64)
+                except Exception as e:
+                    logger.warning(f"Failed to process page {page_num}: {e}")
+                    text_content = f"[Error processing page {page_num}: {e}]"
+
+                # Create TextBlock from result
+                text_block = TextBlock(
+                    text=text_content,
+                    confidence=1.0,  # GLM-4V doesn't provide confidence scores
+                    bbox=(0, 0, 0, 0),  # No bbox info from API
+                    block_type="text",
+                )
+
+                # Create OCRResult for this page
+                result = OCRResult(
+                    text_blocks=[text_block],
+                    source_path=str(pdf_path),
+                    page_number=page_num,
+                    metadata={
+                        "model": self.model,
+                        "provider": "zhipu",
+                        "total_pages": total_pages,
+                    },
+                )
+                results.append(result)
+
+        logger.info(f"PDF processing complete: {len(results)} pages processed")
+        return results
 
     def is_available(self) -> bool:
         """
