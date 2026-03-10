@@ -160,7 +160,7 @@ class GLMOCRBackend(OCRBackend):
             metadata={"model": self.model, "provider": "zhipu"},
         )
 
-    def recognize_pdf(self, pdf_path: Path | str) -> list[OCRResult]:
+    def recognize_pdf(self, pdf_path: Path | str, password: str | None = None) -> list[OCRResult]:
         """
         Recognize text in a PDF file.
 
@@ -170,6 +170,7 @@ class GLMOCRBackend(OCRBackend):
 
         Args:
             pdf_path: Path to the PDF file.
+            password: Optional password for encrypted PDF files.
 
         Returns:
             List of OCRResult, one per page.
@@ -194,7 +195,7 @@ class GLMOCRBackend(OCRBackend):
 
         results: list[OCRResult] = []
 
-        with pdfplumber.open(pdf_path) as pdf:
+        with pdfplumber.open(pdf_path, password=password) as pdf:
             total_pages = len(pdf.pages)
             logger.info(f"Processing PDF with {total_pages} pages")
 
