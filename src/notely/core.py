@@ -17,7 +17,7 @@ from notely.config import NotelyConfig
 from notely.enhancer.enhancer import ThreeLayerEnhancer
 from notely.formatter import MarkdownFormatter
 from notely.models import NotelyResult
-from notely.ocr import OCRBackend, OCRResult, PaddleOCRBackend
+from notely.ocr import GLMOCRBackend, OCRBackend, OCRResult, PaddleOCRBackend
 from notely.utils import extract_audio, extract_key_frames
 from notely.utils.language import detect_transcript_language
 
@@ -146,8 +146,10 @@ class Notely:
                     lang=self.config.ocr.language,
                     use_gpu=self.config.ocr.use_gpu,
                 )
+            elif self.config.ocr.provider == "zhipu":
+                self._ocr = GLMOCRBackend(self.config.ocr)
             else:
-                raise ValueError(f"Unsupported OCR backend: {self.config.ocr.provider}")
+                raise ValueError(f"Unsupported OCR provider: {self.config.ocr.provider}")
 
             logger.info(f"Initialized OCR backend: {self.config.ocr.provider}")
 
