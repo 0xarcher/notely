@@ -294,6 +294,32 @@ notely = Notely.from_yaml("config.yaml")
 | DeepSeek | `deepseek` | deepseek-chat |
 | Custom | `custom` | Any OpenAI-compatible API |
 
+### Supported OCR Providers
+
+| Provider | Provider Value | Description |
+|----------|---------------|-------------|
+| PaddleOCR | `paddleocr` | Local OCR (default), no API key required |
+| Zhipu AI | `zhipu` | Cloud OCR using GLM-4V, supports PDF and images |
+
+### Using Zhipu AI for OCR and LLM
+
+```yaml
+# config.yaml
+ocr:
+  provider: zhipu
+  model: glm-4v-flash
+  api_key: your-zhipu-api-key
+  base_url: https://open.bigmodel.cn/api/paas/v4
+
+llm:
+  provider: zhipu
+  model: glm-4
+  api_key: your-zhipu-api-key
+  base_url: https://open.bigmodel.cn/api/paas/v4
+  temperature: 0.7
+  max_tokens: 4096
+```
+
 ### Processing Different Input Formats
 
 #### Process Video
@@ -317,6 +343,26 @@ asyncio.run(main())
 ```python
 # Same API for audio files
 result = asyncio.run(notely.process("podcast.mp3"))
+result.save("notes.md")
+```
+
+#### Process PDF Documents
+
+```python
+# Process PDF using GLM-OCR (requires Zhipu AI configuration)
+result = asyncio.run(notely.process("presentation.pdf"))
+result.save("notes.md")
+```
+
+#### Process Images
+
+```python
+# Process images (screenshots, slides, etc.)
+result = asyncio.run(notely.process("slide.jpg"))
+result.save("notes.md")
+
+# Also supports PNG, BMP
+result = asyncio.run(notely.process("diagram.png"))
 result.save("notes.md")
 ```
 
