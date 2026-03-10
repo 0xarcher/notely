@@ -48,10 +48,10 @@ class GLMOCRBackend(OCRBackend):
 
         # Lazy import to avoid dependency issues
         try:
-            from zhipuai import ZhipuAI
+            from zhipuai import ZhipuAI  # type: ignore[import-untyped]
         except ImportError as e:
             raise ImportError(
-                "zhipuai package is required for GLM-OCR. " "Install it with: uv add zhipuai"
+                "zhipuai package is required for GLM-OCR. Install it with: uv add zhipuai"
             ) from e
 
         self.client = ZhipuAI(api_key=config.api_key, base_url=config.base_url)
@@ -119,7 +119,8 @@ class GLMOCRBackend(OCRBackend):
                 ],
             )
 
-            return response.choices[0].message.content
+            content = response.choices[0].message.content or ""
+            return content
 
         except Exception as e:
             logger.error(f"GLM-OCR API call failed: {e}")

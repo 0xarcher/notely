@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncGenerator, Iterator
 
 from notely.config import LLMConfig
 
@@ -51,7 +51,7 @@ class ZhipuLLMBackend:
 
         # Lazy import to avoid dependency issues
         try:
-            from zhipuai import ZhipuAI
+            from zhipuai import ZhipuAI  # type: ignore[import-untyped]
         except ImportError as e:
             raise ImportError(
                 "zhipuai package is required for Zhipu LLM. Install it with: uv add zhipuai"
@@ -194,7 +194,7 @@ class ZhipuLLMBackend:
         system_prompt: str | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
-    ) -> Iterator[str]:
+    ) -> AsyncGenerator[str, None]:
         """
         Async version of stream().
 
