@@ -215,8 +215,16 @@ class ComprehensionAgent:
         except json.JSONDecodeError:
             pass
 
-        logger.error(f"Failed to parse JSON response: {response[:200]}...")
-        raise ComprehensionError("Failed to parse JSON response from LLM")
+        # Last resort: treat entire response as summary (for simpler LLMs)
+        logger.warning(
+            f"Failed to parse JSON, treating response as raw summary: {response[:200]}..."
+        )
+        return {
+            "summary": response,
+            "key_concepts": [],
+            "examples": [],
+            "questions": [],
+        }
 
     def _create_fallback_result(self, chunk: SemanticChunk, error: str) -> ComprehensionResult:
         """

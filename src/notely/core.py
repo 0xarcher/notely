@@ -173,6 +173,7 @@ class Notely:
         self,
         input_path: Path | str,
         metadata: dict[str, Any] | None = None,
+        pdf_password: str | None = None,
     ) -> NotelyResult:
         """
         Process input file and generate notes.
@@ -182,6 +183,7 @@ class Notely:
         Args:
             input_path: Path to input file
             metadata: Optional metadata (title, date, etc.)
+            pdf_password: Optional password for encrypted PDF files
 
         Returns:
             NotelyResult with generated notes
@@ -203,7 +205,7 @@ class Notely:
 
         # PDF files
         elif suffix == ".pdf":
-            return await self._process_pdf(input_path, metadata)
+            return await self._process_pdf(input_path, metadata, pdf_password)
 
         # Image files
         elif suffix in [".jpg", ".jpeg", ".png", ".bmp"]:
@@ -320,6 +322,7 @@ class Notely:
         self,
         pdf_path: Path,
         metadata: dict[str, Any] | None = None,
+        password: str | None = None,
     ) -> NotelyResult:
         """
         Process PDF file using GLM-OCR.
@@ -327,6 +330,7 @@ class Notely:
         Args:
             pdf_path: Path to PDF file
             metadata: Optional metadata
+            password: Optional password for encrypted PDF files
 
         Returns:
             NotelyResult with generated notes
@@ -339,7 +343,7 @@ class Notely:
 
         # OCR PDF
         logger.info("Performing OCR on PDF...")
-        ocr_results = self.ocr.recognize_pdf(pdf_path)
+        ocr_results = self.ocr.recognize_pdf(pdf_path, password=password)
         logger.info(f"✓ OCR completed: {len(ocr_results)} pages/sections")
 
         # Generate notes with enhancer
